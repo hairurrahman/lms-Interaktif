@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Play, Sparkles, ChevronRight, ArrowLeft, FileText, FileDown } from 'lucide-react';
 import { convertToEmbed, getVideoKindLabel } from '@/lib/videoEmbed';
+import { LatexRenderer } from '@/components/LatexRenderer';
 
 export function MaterialDetailPage() {
   const [, params] = useRoute<{ id: string }>('/materi/:id');
@@ -39,7 +40,7 @@ export function MaterialDetailPage() {
   const embed = material.videoUrl ? convertToEmbed(material.videoUrl) : null;
 
   return (
-    <div className="mx-auto max-w-4xl px-4 md:px-6 py-6 md:py-8 space-y-6">
+    <div className="mx-auto max-w-4xl px-3 sm:px-4 md:px-6 py-4 md:py-8 space-y-6">
       {/* Breadcrumb */}
       <Link
         href={subject ? `/mapel/${subject.id}` : '/mapel'}
@@ -118,23 +119,25 @@ export function MaterialDetailPage() {
         </Card>
       )}
 
-      {/* Ringkasan (text atau HTML) */}
+      {/* Ringkasan (text atau HTML) — dengan dukungan LaTeX */}
       <Card className="border-2 rounded-3xl">
-        <CardContent className="p-6 md:p-7">
+        <CardContent className="p-4 sm:p-5 md:p-7">
           <div className="flex items-center gap-2 font-bold text-lg mb-3">
             <FileText className="h-5 w-5 text-primary" />
             Ringkasan Materi
           </div>
           {material.summaryFormat === 'html' ? (
-            <div
+            <LatexRenderer
+              html={material.summary}
               className="material-html leading-relaxed text-foreground/90"
-              dangerouslySetInnerHTML={{ __html: material.summary }}
               data-testid="text-summary-html"
             />
           ) : (
-            <p className="text-foreground/90 leading-relaxed whitespace-pre-line" data-testid="text-summary">
-              {material.summary}
-            </p>
+            <LatexRenderer
+              html={`<span>${material.summary}</span>`}
+              className="text-foreground/90 leading-relaxed whitespace-pre-line block"
+              data-testid="text-summary"
+            />
           )}
         </CardContent>
       </Card>

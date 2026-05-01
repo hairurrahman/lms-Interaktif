@@ -27,7 +27,7 @@ export function Navbar() {
               <span className="text-xl">🎓</span>
             )}
           </div>
-          <span className="hidden sm:inline">SekolahSeru</span>
+          <span className="inline-block">SekolahSeru</span>
         </Link>
 
         <div className="flex items-center gap-2">
@@ -41,21 +41,7 @@ export function Navbar() {
               ⭐ {user.points}
             </div>
           )}
-          <ProfileSettings>
-            <button className="flex items-center gap-2 rounded-full bg-card border border-border px-2 py-1.5 hover:bg-accent/50 transition-colors text-left" data-testid="user-chip">
-              <div className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center overflow-hidden rounded-full bg-muted">
-                {user.avatar.startsWith('data:') ? (
-                  <img src={user.avatar} alt="Avatar" className="h-full w-full object-cover" />
-                ) : (
-                  <span className="text-xl leading-none" aria-hidden>{user.avatar}</span>
-                )}
-              </div>
-              <div className="hidden sm:block text-xs leading-tight pr-2">
-                <div className="font-bold text-foreground">{user.name.split(' ')[0]}</div>
-                <div className="text-muted-foreground">{user.role === 'guru' ? 'Guru' : `Kelas ${user.kelas ?? '-'}`}</div>
-              </div>
-            </button>
-          </ProfileSettings>
+          {/* Profile settings moved to BottomDock */}
           <Button
             variant="ghost"
             size="icon"

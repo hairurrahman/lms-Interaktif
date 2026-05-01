@@ -400,3 +400,30 @@
   border: 2px solid hsl(var(--border));
   margin: 1rem 0;
 }
+
+/* ── KaTeX / LaTeX formula rendering ────────────────────────────────────── */
+/* Inline formulas */
+.katex {
+  font-size: 1em;
+  color: hsl(var(--foreground));
+}
+/* Display (block) formulas — add spacing and center */
+.katex-display {
+  margin: 0.9rem 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+/* Error highlight */
+.latex-error {
+  background: hsl(var(--destructive) / 0.12);
+  color: hsl(var(--destructive));
+  border-radius: 0.3rem;
+  padding: 0.05rem 0.35rem;
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+}
+/* Ensure KaTeX doesn't break quiz option buttons */
+.katex-html {
+  white-space: normal;
+}
+

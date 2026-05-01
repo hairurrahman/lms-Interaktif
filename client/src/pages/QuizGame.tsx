@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
 import { Confetti } from '@/components/Confetti';
+import { LatexRenderer } from '@/components/LatexRenderer';
 import { Check, X, Clock, Sparkles, Home, RefreshCw, ArrowRight, Trophy, PenLine, HelpCircle } from 'lucide-react';
 
 type AnswerMap = Record<string, string | string[] | Record<string, boolean>>;
@@ -267,7 +268,11 @@ export function QuizGamePage() {
                       </div>
                       <div className="flex-1 text-sm">
                         <div className="font-semibold">
-                          {i + 1}. {q.question}
+                          {i + 1}.{' '}
+                          <LatexRenderer
+                            html={q.question}
+                            className="inline"
+                          />
                         </div>
                         {q.type === 'mcq' ? (
                           !correct && (
@@ -358,10 +363,11 @@ export function QuizGamePage() {
             <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Pertanyaan {current + 1}</div>
             <TypeBadge type={q.type} />
           </div>
-          <h2 
-            className="text-lg md:text-xl font-extrabold leading-snug" 
+          {/* Question text */}
+          <LatexRenderer
+            html={q.question}
+            className="text-lg md:text-xl font-extrabold leading-snug"
             data-testid="text-question"
-            dangerouslySetInnerHTML={{ __html: q.question }}
           />
 
           {/* MCQ */}
@@ -382,7 +388,10 @@ export function QuizGamePage() {
                     <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl font-extrabold text-sm md:text-base ${isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground'}`}>
                       {letter}
                     </div>
-                    <span className="font-semibold text-sm md:text-base flex-1">{opt.text}</span>
+                    <LatexRenderer
+                      html={opt.text}
+                      className="font-semibold text-sm md:text-base flex-1"
+                    />
                   </button>
                 );
               })}
@@ -418,7 +427,10 @@ export function QuizGamePage() {
                       <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg font-extrabold text-sm ${isChecked ? 'bg-primary/20 text-primary' : 'bg-muted text-foreground'}`}>
                         {letter}
                       </div>
-                      <span className="font-semibold text-sm md:text-base flex-1">{opt.text}</span>
+                      <LatexRenderer
+                        html={opt.text}
+                        className="font-semibold text-sm md:text-base flex-1"
+                      />
                     </button>
                   );
                 })}
@@ -450,7 +462,10 @@ export function QuizGamePage() {
                           <td className="p-2 md:p-3 align-top">
                             <div className="flex items-start gap-1.5 md:gap-2">
                               <span className="text-muted-foreground font-bold">{i + 1}.</span>
-                              <span className="font-semibold">{s.text}</span>
+                              <LatexRenderer
+                                html={s.text}
+                                className="font-semibold flex-1"
+                              />
                             </div>
                           </td>
                           <td className="p-2 text-center align-top">
@@ -507,6 +522,7 @@ function TypeBadge({ type }: { type: QuizQuestion['type'] }) {
     'mcq': { label: 'Pilihan Ganda', cls: 'bg-primary/15 text-primary border-primary/40' },
     'mcq-multi': { label: 'PG Kompleks', cls: 'bg-accent/15 text-accent border-accent/40' },
     'true-false': { label: 'Benar / Salah', cls: 'bg-secondary/15 text-secondary border-secondary/40' },
+    'essay': { label: 'Esai', cls: 'bg-muted/15 text-muted-foreground border-muted/40' },
   };
   const m = map[type];
   return (

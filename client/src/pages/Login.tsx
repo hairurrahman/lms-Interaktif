@@ -17,7 +17,7 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [role, setRole] = useState<Role>('siswa');
-  const [kelas, setKelas] = useState('6A');
+  const [kelas, setKelas] = useState('6');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -114,9 +114,7 @@ export function LoginPage() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="6A">6A</SelectItem>
-                            <SelectItem value="6B">6B</SelectItem>
-                            <SelectItem value="6C">6C</SelectItem>
+                            <SelectItem value="6">Kelas 6</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>

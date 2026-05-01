@@ -380,7 +380,7 @@ export function TeacherMaterialsPage() {
           </CardContent>
         </Card>
 
-        {/* Existing list */}
+        {/* Existing list — grouped by chapter & topic */}
         <Card className="border-2 rounded-3xl lg:col-span-2">
           <CardContent className="p-5">
             <div className="flex items-center gap-2 font-bold mb-3">
@@ -397,29 +397,156 @@ export function TeacherMaterialsPage() {
                 Belum ada materi di mapel ini.
               </div>
             ) : (
-              <ul className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
-                {materials.map((m) => (
-                  <li key={m.id} className="rounded-2xl border border-border p-3 text-sm flex items-start justify-between gap-2" data-testid={`material-${m.id}`}>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-bold truncate">{m.title}</div>
-                      <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{m.description}</div>
-                      <div className="flex gap-1.5 mt-1.5 text-[10px]">
-                        {m.videoUrl && <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary font-bold">🎬 Video</span>}
-                        {m.pdfUrl && <span className="px-1.5 py-0.5 rounded bg-destructive/10 text-destructive font-bold">📄 PDF</span>}
-                        {m.summaryFormat === 'html' && <span className="px-1.5 py-0.5 rounded bg-accent/10 text-accent font-bold">HTML</span>}
+              <div className="space-y-4 max-h-[640px] overflow-y-auto pr-1">
+                {/* Sort chapters by order, then group materials by chapter → topic */}
+                {[...chapters]
+                  .sort((a, b) => a.order - b.order)
+                  .map((chapter) => {
+                    const chapterMaterials = materials.filter((m) => m.chapterId === chapter.id);
+                    if (chapterMaterials.length === 0) return null;
+                    return (
+                      <div key={chapter.id}>
+                        {/* Chapter header */}
+                        <div className="sticky top-0 z-10 bg-muted/80 backdrop-blur-sm rounded-xl px-3 py-1.5 mb-2 flex items-center gap-2">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-primary">📖 {chapter.title}</span>
+                        </div>
+                        <div className="space-y-3 pl-2">
+                          {/* Group by topics in the order they appear in chapter.topics */}
+                          {chapter.topics.map((topic) => {
+                            const topicMaterials = chapterMaterials.filter((m) => m.topicId === topic.id);
+                            if (topicMaterials.length === 0) return null;
+                            return (
+                              <div key={topic.id}>
+                                {/* Topic sub-header */}
+                                <div className="flex items-center gap-1.5 mb-1.5">
+                                  <div className="h-px flex-1 bg-border" />
+                                  <span className="text-[10px] font-bold text-muted-foreground whitespace-nowrap">
+                                    🗂 {topic.title}
+                                  </span>
+                                  <div className="h-px flex-1 bg-border" />
+                                </div>
+                                <ul className="space-y-2">
+                                  {topicMaterials.map((m) => (
+                                    <li
+                                      key={m.id}
+                                      className={`rounded-2xl border-2 p-3 text-sm flex items-start justify-between gap-2 transition-colors ${
+                                        editingId === m.id
+                                          ? 'border-primary bg-primary/5'
+                                          : 'border-border hover:border-primary/40'
+                                      }`}
+                                      data-testid={`material-${m.id}`}
+                                    >
+                                      <div className="flex-1 min-w-0">
+                                        <div className="font-bold truncate">{m.title}</div>
+                                        <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{m.description}</div>
+                                        <div className="flex flex-wrap gap-1.5 mt-1.5 text-[10px]">
+                                          {m.videoUrl && <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary font-bold">🎬 Video</span>}
+                                          {m.pdfUrl && <span className="px-1.5 py-0.5 rounded bg-destructive/10 text-destructive font-bold">📄 PDF</span>}
+                                          {m.summaryFormat === 'html' && <span className="px-1.5 py-0.5 rounded bg-accent/10 text-accent font-bold">HTML</span>}
+                                        </div>
+                                      </div>
+                                      <div className="flex flex-col gap-1 shrink-0">
+                                        <Button
+                                          size="icon"
+                                          variant={editingId === m.id ? 'default' : 'ghost'}
+                                          onClick={() => handleEdit(m)}
+                                          data-testid={`edit-material-${m.id}`}
+                                          className="h-8 w-8"
+                                          title="Edit materi ini"
+                                        >
+                                          <CodeIcon className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          onClick={() => handleDelete(m.id, m.title)}
+                                          data-testid={`delete-material-${m.id}`}
+                                          className="h-8 w-8"
+                                          title="Hapus materi"
+                                        >
+                                          <Trash2 className="h-4 w-4 text-destructive" />
+                                        </Button>
+                                      </div>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            );
+                          })}
+                          {/* Materials without a matching topic in chapter.topics (edge case) */}
+                          {(() => {
+                            const knownTopicIds = new Set(chapter.topics.map((t) => t.id));
+                            const orphans = chapterMaterials.filter((m) => !knownTopicIds.has(m.topicId));
+                            if (orphans.length === 0) return null;
+                            return (
+                              <div>
+                                <div className="flex items-center gap-1.5 mb-1.5">
+                                  <div className="h-px flex-1 bg-border" />
+                                  <span className="text-[10px] font-bold text-muted-foreground whitespace-nowrap">🗂 Topik Lainnya</span>
+                                  <div className="h-px flex-1 bg-border" />
+                                </div>
+                                <ul className="space-y-2">
+                                  {orphans.map((m) => (
+                                    <li
+                                      key={m.id}
+                                      className={`rounded-2xl border-2 p-3 text-sm flex items-start justify-between gap-2 transition-colors ${
+                                        editingId === m.id ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'
+                                      }`}
+                                      data-testid={`material-${m.id}`}
+                                    >
+                                      <div className="flex-1 min-w-0">
+                                        <div className="font-bold truncate">{m.title}</div>
+                                        <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{m.description}</div>
+                                      </div>
+                                      <div className="flex flex-col gap-1 shrink-0">
+                                        <Button size="icon" variant="ghost" onClick={() => handleEdit(m)} data-testid={`edit-material-${m.id}`} className="h-8 w-8">
+                                          <CodeIcon className="h-4 w-4 text-primary" />
+                                        </Button>
+                                        <Button size="icon" variant="ghost" onClick={() => handleDelete(m.id, m.title)} data-testid={`delete-material-${m.id}`} className="h-8 w-8">
+                                          <Trash2 className="h-4 w-4 text-destructive" />
+                                        </Button>
+                                      </div>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            );
+                          })()}
+                        </div>
                       </div>
+                    );
+                  })}
+                {/* Materials whose chapterId doesn't match any chapter (edge case) */}
+                {(() => {
+                  const knownChapterIds = new Set(chapters.map((c) => c.id));
+                  const orphans = materials.filter((m) => !knownChapterIds.has(m.chapterId));
+                  if (orphans.length === 0) return null;
+                  return (
+                    <div>
+                      <div className="sticky top-0 z-10 bg-muted/80 backdrop-blur-sm rounded-xl px-3 py-1.5 mb-2">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">📖 Bab Lainnya</span>
+                      </div>
+                      <ul className="space-y-2 pl-2">
+                        {orphans.map((m) => (
+                          <li key={m.id} className="rounded-2xl border border-border p-3 text-sm flex items-start justify-between gap-2" data-testid={`material-${m.id}`}>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-bold truncate">{m.title}</div>
+                            </div>
+                            <div className="flex flex-col gap-1 shrink-0">
+                              <Button size="icon" variant="ghost" onClick={() => handleEdit(m)} data-testid={`edit-material-${m.id}`} className="h-8 w-8">
+                                <CodeIcon className="h-4 w-4 text-primary" />
+                              </Button>
+                              <Button size="icon" variant="ghost" onClick={() => handleDelete(m.id, m.title)} data-testid={`delete-material-${m.id}`} className="h-8 w-8">
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
-                    <div className="flex flex-col gap-1">
-                      <Button size="icon" variant="ghost" onClick={() => handleEdit(m)} data-testid={`edit-material-${m.id}`} className="h-8 w-8">
-                        <CodeIcon className="h-4 w-4 text-primary" />
-                      </Button>
-                      <Button size="icon" variant="ghost" onClick={() => handleDelete(m.id, m.title)} data-testid={`delete-material-${m.id}`} className="h-8 w-8">
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+                  );
+                })()}
+              </div>
             )}
           </CardContent>
         </Card>
