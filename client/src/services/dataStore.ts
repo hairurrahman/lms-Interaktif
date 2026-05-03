@@ -47,6 +47,8 @@ import {
   type Subject,
   type Subtopic,
   type Topic,
+  type School,
+  MOCK_SCHOOLS,
 } from '@/lib/mockData';
 
 // ---------- Mutable in-memory store (DEMO MODE) ----------
@@ -60,6 +62,7 @@ const store = {
   badges: [...MOCK_BADGES],
   posts: [...MOCK_POSTS],
   comments: [...MOCK_COMMENTS],
+  schools: [...MOCK_SCHOOLS],
 };
 
 type Listener = () => void;
@@ -75,6 +78,43 @@ export function subscribe(fn: Listener): Unsubscribe {
 }
 
 const uid = () => Math.random().toString(36).slice(2, 10);
+
+// ---------- Schools ----------
+export async function getSchools(): Promise<School[]> {
+  if (DEMO_MODE || !db) return [...store.schools];
+  const snap = await getDocs(collection(db, 'schools'));
+  return snap.docs.map((d) => ({ ...(d.data() as Omit<School, 'id'>), id: d.id }));
+}
+
+export async function createSchool(data: Omit<School, 'id'>): Promise<School> {
+  if (DEMO_MODE || !db) {
+    const s: School = { ...data, id: uid() };
+    store.schools.push(s);
+    notify();
+    return s;
+  }
+  const ref = await addDoc(collection(db, 'schools'), data);
+  return { ...data, id: ref.id };
+}
+
+export async function updateSchool(id: string, data: Partial<Omit<School, 'id'>>): Promise<void> {
+  if (DEMO_MODE || !db) {
+    const idx = store.schools.findIndex((s) => s.id === id);
+    if (idx >= 0) store.schools[idx] = { ...store.schools[idx], ...data };
+    notify();
+    return;
+  }
+  await updateDoc(doc(db, 'schools', id), data);
+}
+
+export async function deleteSchool(id: string): Promise<void> {
+  if (DEMO_MODE || !db) {
+    store.schools = store.schools.filter((s) => s.id !== id);
+    notify();
+    return;
+  }
+  await deleteDoc(doc(db, 'schools', id));
+}
 
 // ---------- Subjects ----------
 export async function getSubjects(): Promise<Subject[]> {
@@ -487,6 +527,35 @@ export async function updateUser(id: string, data: Partial<Omit<AppUser, 'id'>>)
     return;
   }
   await updateDoc(doc(db, 'users', id), data);
+}
+
+export async function createUser(data: Omit<AppUser, 'id' | 'points' | 'badges' | 'streakDays'>): Promise<AppUser> {
+  const newUser: AppUser = {
+    ...data,
+    id: uid(),
+    points: 0,
+    badges: [],
+    streakDays: 0,
+  };
+  if (DEMO_MODE || !db) {
+    store.users.push(newUser);
+    notify();
+    return newUser;
+  }
+  // Di Firebase sungguhan, sebaiknya pakai Cloud Functions untuk create auth user,
+  // tapi di sini kita simpan saja document-nya untuk mensimulasikan.
+  const ref = await addDoc(collection(db, 'users'), newUser);
+  return { ...newUser, id: ref.id };
+}
+
+export async function deleteUser(id: string): Promise<void> {
+  if (DEMO_MODE || !db) {
+    store.users = store.users.filter((u) => u.id !== id);
+    notify();
+    return;
+  }
+  // Menghapus data doc di Firestore. Akun Auth asli butuh Admin SDK di backend.
+  await deleteDoc(doc(db, 'users', id));
 }
 
 export async function getAllUsers(): Promise<AppUser[]> {

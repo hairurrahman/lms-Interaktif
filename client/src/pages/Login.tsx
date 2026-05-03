@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,7 +7,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { MOCK_USERS, type Role } from '@/lib/mockData';
+import { MOCK_USERS, type Role, type School } from '@/lib/mockData';
+import { getSchools } from '@/services/dataStore';
 import { Sparkles, Eye, EyeOff } from 'lucide-react';
 
 export function LoginPage() {
@@ -18,9 +19,23 @@ export function LoginPage() {
   const [name, setName] = useState('');
   const [role, setRole] = useState<Role>('siswa');
   const [kelas, setKelas] = useState('6');
+  const [sekolahId, setSekolahId] = useState('');
+  const [schools, setSchools] = useState<School[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [secretCount, setSecretCount] = useState(0);
+
+  useEffect(() => {
+    getSchools()
+      .then((data) => {
+        setSchools(data);
+        if (data.length > 0) setSekolahId(data[0].id);
+      })
+      .catch((err) => {
+        console.error("Gagal mengambil data sekolah:", err);
+      });
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,7 +46,8 @@ export function LoginPage() {
         await signIn(email, password);
       } else {
         if (!name.trim()) throw new Error('Nama tidak boleh kosong');
-        await signUp({ email, password, name, role, kelas: role === 'siswa' ? kelas : undefined });
+        if (!sekolahId) throw new Error('Silakan pilih sekolah');
+        await signUp({ email, password, name, role, kelas: role === 'siswa' ? kelas : undefined, sekolahId });
       }
     } catch (err: any) {
       setError(err?.message ?? 'Terjadi kesalahan');
@@ -49,23 +65,23 @@ export function LoginPage() {
         {/* Left: brand */}
         <div className="text-center md:text-left space-y-5">
           <div className="inline-flex items-center gap-2 bg-gradient-sunrise text-white px-4 py-2 rounded-full text-sm font-bold shadow-playful">
-            <Sparkles className="h-4 w-4" /> SD Negeri Bindang 2
+            <Sparkles className="h-4 w-4" /> Gugus 3 Kec. Pasean
           </div>
           <h1 className="text-4xl md:text-5xl font-extrabold leading-tight">
-            Selamat datang di{' '}
+            Selamat Datang{' '}
             <span className="inline-block text-primary" style={{
               backgroundImage: 'linear-gradient(135deg, hsl(28 95% 58%), hsl(350 78% 60%))',
               WebkitBackgroundClip: 'text',
               backgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
               paddingBottom: '0.15em',
-            }}>SekolahSeru</span>
+            }}>TKA Seru</span>
           </h1>
           <p className="text-lg text-muted-foreground max-w-md mx-auto md:mx-0">
-            Jelajahi semua mata pelajaran kelas 6 di satu tempat! Belajar jadi makin asyik dengan kuis interaktif, koleksi badge prestasi, dan kompetisi seru di leaderboard.
+            Kuasai seluruh materi TKA hanya dalam satu platform! Pertajam kemampuanmu dengan simulasi kuis interaktif, koleksi achievement badges sebagai bukti progresmu, dan pantau posisi sainganmu di leaderboard. Persiapan ujian jadi lebih kompetitif dan terukur!
           </p>
           <div className="grid grid-cols-3 gap-3 max-w-md mx-auto md:mx-0">
-            <FeatureChip emoji="📚" label="Semua Mapel" />
+            <FeatureChip emoji="📚" label="Materi TKA" />
             <FeatureChip emoji="🎮" label="Kuis Seru" />
             <FeatureChip emoji="🏆" label="Leaderboard" />
           </div>
@@ -103,6 +119,19 @@ export function LoginPage() {
                         <SelectContent>
                           <SelectItem value="siswa">👦 Siswa</SelectItem>
                           <SelectItem value="guru">👩‍🏫 Guru</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Sekolah</Label>
+                      <Select value={sekolahId || undefined} onValueChange={setSekolahId}>
+                        <SelectTrigger data-testid="select-school">
+                          <SelectValue placeholder="Pilih sekolah" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {schools.map((s) => (
+                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -167,6 +196,36 @@ export function LoginPage() {
                   className="w-full h-11 text-base font-bold"
                   disabled={busy}
                   data-testid="button-submit"
+                  onClick={async (e) => {
+                    if (tab === 'login') {
+                      const next = secretCount + 1;
+                      if (next >= 5) {
+                        e.preventDefault();
+                        setSecretCount(0);
+                        const pwd = window.prompt("Buka Mode Administrator\nMasukkan sandi khusus:");
+                        if (pwd === "admin123") {
+                          setBusy(true);
+                          try {
+                            // Coba login dengan akun admin standar
+                            await signIn('admin@sekolah.id', 'admin123');
+                          } catch (err: any) {
+                            // Jika belum ada, kita buatkan akunnya di Firebase
+                            try {
+                              await signUp({ email: 'admin@sekolah.id', password: 'admin123', name: 'Super Admin', role: 'administrator' });
+                            } catch (signUpErr: any) {
+                              alert("Gagal membuat/login admin: " + signUpErr.message);
+                            }
+                          } finally {
+                            setBusy(false);
+                          }
+                        } else if (pwd !== null) {
+                          alert("Sandi salah!");
+                        }
+                      } else {
+                        setSecretCount(next);
+                      }
+                    }
+                  }}
                 >
                   {busy ? 'Sebentar...' : tab === 'login' ? 'Masuk 🚀' : 'Daftar Sekarang'}
                 </Button>

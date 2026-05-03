@@ -16,7 +16,7 @@ interface AuthContextValue {
   user: AppUser | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (params: { email: string; password: string; name: string; role: Role; kelas?: string }) => Promise<void>;
+  signUp: (params: { email: string; password: string; name: string; role: Role; kelas?: string; sekolahId?: string }) => Promise<void>;
   signOut: () => Promise<void>;
   loginAsDemo: (userId: string) => void;
   demoMode: boolean;
@@ -96,15 +96,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signInWithEmailAndPassword(auth, email, password);
   };
 
-  const signUp: AuthContextValue['signUp'] = async ({ email, password, name, role, kelas }) => {
+  const signUp: AuthContextValue['signUp'] = async ({ email, password, name, role, kelas, sekolahId }) => {
     if (DEMO_MODE || !auth || !db) {
       const newUser: AppUser = {
         id: `new-${Date.now()}`,
         name,
         email,
         role,
-        avatar: role === 'guru' ? '👩‍🏫' : '🙂',
+        avatar: role === 'administrator' ? '👨‍💼' : role === 'guru' ? '👩‍🏫' : '🙂',
         kelas,
+        sekolahId,
         points: 0,
         badges: [],
         streakDays: 0,
@@ -120,8 +121,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       name,
       email,
       role,
-      avatar: role === 'guru' ? '👩‍🏫' : '🙂',
+      avatar: role === 'administrator' ? '👨‍💼' : role === 'guru' ? '👩‍🏫' : '🙂',
       kelas,
+      sekolahId,
       points: 0,
       badges: [],
       streakDays: 0,
@@ -132,6 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       role: newUser.role,
       avatar: newUser.avatar,
       kelas: newUser.kelas ?? null,
+      sekolahId: newUser.sekolahId ?? null,
       points: 0,
       badges: [],
       streakDays: 0,

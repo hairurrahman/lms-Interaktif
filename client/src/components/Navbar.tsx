@@ -4,15 +4,21 @@ import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { LogOut } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { ProfileSettings } from './ProfileSettings';
+import { getSchools } from '@/services/dataStore';
+import type { School } from '@/lib/mockData';
 
 export function Navbar() {
   const { user, signOut, demoMode } = useAuth();
-  const [schoolLogo, setSchoolLogo] = useState<string | null>(null);
+  const [school, setSchool] = useState<School | null>(null);
 
   useEffect(() => {
-    setSchoolLogo(localStorage.getItem('schoolLogo'));
-  }, []);
+    if (user?.sekolahId) {
+      getSchools().then((schools) => {
+        const found = schools.find((s) => s.id === user.sekolahId);
+        if (found) setSchool(found);
+      });
+    }
+  }, [user?.sekolahId]);
 
   if (!user) return null;
 
@@ -20,14 +26,12 @@ export function Navbar() {
     <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-6">
         <Link href="/" className="flex items-center gap-2 font-bold text-lg" data-testid="link-home">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-sunrise text-white shadow-playful overflow-hidden">
-            {schoolLogo ? (
-              <img src={schoolLogo} alt="Logo Sekolah" className="h-full w-full object-cover" />
-            ) : (
-              <span className="text-xl">🎓</span>
-            )}
-          </div>
-          <span className="inline-block">SekolahSeru</span>
+          {school?.logo ? (
+            <img src={school.logo} alt="Logo Sekolah" className="h-9 w-9 object-contain" />
+          ) : (
+            <div className="flex h-9 w-9 items-center justify-center text-xl">🎓</div>
+          )}
+          <span className="inline-block">{school?.name || 'SekolahSeru'}</span>
         </Link>
 
         <div className="flex items-center gap-2">

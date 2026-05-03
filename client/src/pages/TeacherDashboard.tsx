@@ -38,10 +38,20 @@ export function TeacherDashboard() {
       setMaterialsCount(mTotal);
       setQuizzesCount(qTotal);
       const users = await getAllUsers();
-      setStudents(users.filter((u) => u.role === 'siswa'));
-      setScores(await getAllScores());
+      let studs = users.filter((u) => u.role === 'siswa');
+      if (user?.role === 'guru' && user.sekolahId) {
+        studs = studs.filter((u) => u.sekolahId === user.sekolahId);
+      }
+      setStudents(studs);
+      
+      let scrs = await getAllScores();
+      if (user?.role === 'guru' && user.sekolahId) {
+        const studIds = new Set(studs.map(s => s.id));
+        scrs = scrs.filter(s => studIds.has(s.userId));
+      }
+      setScores(scrs);
     })();
-  }, []);
+  }, [user]);
 
   if (!user) return null;
 
@@ -73,8 +83,12 @@ export function TeacherDashboard() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <QuickAction href="/guru/materi" icon={PenSquare} label="Tambah Materi" color="bg-gradient-sunrise" testId="card-add-material" />
-        <QuickAction href="/guru/kuis" icon={Sparkles} label="Buat Kuis" color="bg-gradient-candy" testId="card-add-quiz" />
+        {user.role === 'administrator' && (
+          <>
+            <QuickAction href="/guru/materi" icon={PenSquare} label="Tambah Materi" color="bg-gradient-sunrise" testId="card-add-material" />
+            <QuickAction href="/guru/kuis" icon={Sparkles} label="Buat Kuis" color="bg-gradient-candy" testId="card-add-quiz" />
+          </>
+        )}
         <QuickAction href="/guru/siswa" icon={Users} label="Progres Siswa" color="bg-gradient-forest" testId="card-view-students" />
       </div>
 

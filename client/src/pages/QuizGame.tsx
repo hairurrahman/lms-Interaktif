@@ -87,6 +87,10 @@ export function QuizGamePage() {
   useEffect(() => {
     if (!done || submitted || !quiz || !user) return;
     setSubmitted(true);
+    
+    // Cegah admin dan guru menyimpan skor
+    if (user.role === 'guru' || user.role === 'administrator') return;
+
     (async () => {
       const studentAnswers: StudentAnswer[] = quiz.questions.map((q) => {
         const resp = answers[q.id];

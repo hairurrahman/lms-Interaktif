@@ -21,11 +21,12 @@ import { TeacherMaterialsPage } from '@/pages/TeacherMaterials';
 import { TeacherQuizzesPage } from '@/pages/TeacherQuizzes';
 import { TeacherStudentsPage } from '@/pages/TeacherStudents';
 import { TeacherSubjectsPage } from '@/pages/TeacherSubjects';
+import { AdminUsersPage } from '@/pages/AdminUsers';
 
 
 function DashboardRouter() {
   const { user } = useAuth();
-  return user?.role === 'guru' ? <TeacherDashboard /> : <StudentDashboard />;
+  return (user?.role === 'guru' || user?.role === 'administrator') ? <TeacherDashboard /> : <StudentDashboard />;
 }
 
 function AppRouter() {
@@ -43,6 +44,7 @@ function AppRouter() {
       <Route path="/guru/kuis" component={TeacherQuizzesPage} />
       <Route path="/guru/siswa" component={TeacherStudentsPage} />
       <Route path="/guru/mapel" component={TeacherSubjectsPage} />
+      <Route path="/admin/pengguna" component={AdminUsersPage} />
 
       <Route component={NotFound} />
     </Switch>

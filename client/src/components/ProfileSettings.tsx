@@ -12,7 +12,6 @@ export function ProfileSettings({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const logoInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   if (!user) return <>{children}</>;
@@ -68,21 +67,6 @@ export function ProfileSettings({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    try {
-      const webpDataUrl = await processImage(file);
-      localStorage.setItem('schoolLogo', webpDataUrl);
-      toast({ title: 'Berhasil', description: 'Logo sekolah diperbarui' });
-      setTimeout(() => window.location.reload(), 500);
-    } catch (err) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Gagal memproses logo' });
-    } finally {
-      setUploading(false);
-    }
-  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -120,18 +104,6 @@ export function ProfileSettings({ children }: { children: React.ReactNode }) {
             <div className="font-bold capitalize">{user.role} {user.kelas ? `- Kelas ${user.kelas}` : ''}</div>
           </div>
 
-          {user.role === 'guru' && (
-            <div className="pt-4 border-t border-border space-y-3">
-              <Label className="font-bold">Pengaturan Sekolah</Label>
-              <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-card">
-                <div className="text-sm text-muted-foreground">Logo Sekolah</div>
-                <input type="file" accept="image/*" className="hidden" ref={logoInputRef} onChange={handleLogoUpload} disabled={uploading} />
-                <Button onClick={() => logoInputRef.current?.click()} disabled={uploading} size="sm" className="rounded-xl">
-                  Upload Logo
-                </Button>
-              </div>
-            </div>
-          )}
         </div>
       </DialogContent>
     </Dialog>

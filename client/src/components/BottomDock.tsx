@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'wouter';
 import { useAuth } from '@/context/AuthContext';
-import { Home, BookOpen, MessageSquare, Trophy, Sparkles, GraduationCap, Layers } from 'lucide-react';
+import { Home, BookOpen, MessageSquare, Trophy, Sparkles, GraduationCap, Layers, Users } from 'lucide-react';
 import { ProfileSettings } from './ProfileSettings';
 
 export function BottomDock() {
@@ -17,13 +17,20 @@ export function BottomDock() {
   ];
   const teacherLinks = [
     { href: '/', label: 'Dasbor', icon: Home },
+    { href: '/guru/siswa', label: 'Siswa', icon: GraduationCap },
+    { href: '/mapel', label: 'Eksplor', icon: BookOpen },
+    { href: '/forum', label: 'Forum', icon: MessageSquare },
+  ];
+  const adminLinks = [
+    { href: '/', label: 'Dasbor', icon: Home },
     { href: '/guru/mapel', label: 'Mapel', icon: Layers },
     { href: '/guru/materi', label: 'Materi', icon: BookOpen },
     { href: '/guru/kuis', label: 'Kuis', icon: Sparkles },
     { href: '/guru/siswa', label: 'Siswa', icon: GraduationCap },
+    { href: '/admin/pengguna', label: 'Pengguna', icon: Users },
     { href: '/forum', label: 'Forum', icon: MessageSquare },
   ];
-  const links = user.role === 'guru' ? teacherLinks : studentLinks;
+  const links = user.role === 'administrator' ? adminLinks : user.role === 'guru' ? teacherLinks : studentLinks;
 
   return (
     <div className="fixed bottom-4 left-0 w-full flex justify-center z-[100] px-2 pointer-events-none">

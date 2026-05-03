@@ -4,8 +4,10 @@ import type { AppUser, Score, Subject, Badge as BadgeType } from '@/lib/mockData
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Search, Users, TrendingUp, Trophy } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 
 export function TeacherStudentsPage() {
+  const { user } = useAuth();
   const [students, setStudents] = useState<AppUser[]>([]);
   const [scores, setScores] = useState<Score[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -14,12 +16,24 @@ export function TeacherStudentsPage() {
 
   useEffect(() => {
     (async () => {
-      setStudents((await getAllUsers()).filter((u) => u.role === 'siswa'));
-      setScores(await getAllScores());
+      let allUsers = await getAllUsers();
+      let studs = allUsers.filter((u) => u.role === 'siswa');
+      if (user?.role === 'guru' && user.sekolahId) {
+        studs = studs.filter((u) => u.sekolahId === user.sekolahId);
+      }
+      setStudents(studs);
+      
+      let allScrs = await getAllScores();
+      if (user?.role === 'guru' && user.sekolahId) {
+        const studIds = new Set(studs.map(s => s.id));
+        allScrs = allScrs.filter(s => studIds.has(s.userId));
+      }
+      setScores(allScrs);
+      
       setSubjects(await getSubjects());
       setBadges(await getBadges());
     })();
-  }, []);
+  }, [user]);
 
   const badgeMap = Object.fromEntries(badges.map((b) => [b.id, b]));
 

@@ -1,7 +1,7 @@
 // Mock data for DEMO MODE — mirrors the Firestore schema so you can see
 // every feature working without a real Firebase project.
 
-export type Role = 'siswa' | 'guru';
+export type Role = 'siswa' | 'guru' | 'administrator';
 
 export interface AppUser {
   id: string;
@@ -10,9 +10,17 @@ export interface AppUser {
   role: Role;
   avatar: string;
   kelas?: string;
+  sekolahId?: string;
   points: number;
   badges: string[];
   streakDays: number;
+}
+
+export interface School {
+  id: string;
+  name: string;
+  address: string;
+  logo?: string;
 }
 
 export interface Subject {
@@ -184,12 +192,18 @@ export interface Comment {
 // ================ SEED DATA ================
 
 export const MOCK_USERS: AppUser[] = [
-  { id: 'siswa-1', name: 'Aisyah Putri', email: 'aisyah@siswa.id', role: 'siswa', avatar: '👧', kelas: '6A', points: 1240, badges: ['first-quiz', 'math-master', 'streak-3'], streakDays: 5 },
-  { id: 'siswa-2', name: 'Budi Santoso', email: 'budi@siswa.id', role: 'siswa', avatar: '👦', kelas: '6A', points: 980, badges: ['first-quiz', 'reader'], streakDays: 3 },
-  { id: 'siswa-3', name: 'Citra Wijaya', email: 'citra@siswa.id', role: 'siswa', avatar: '🧒', kelas: '6B', points: 1560, badges: ['first-quiz', 'math-master', 'reader', 'streak-3', 'scientist'], streakDays: 7 },
-  { id: 'siswa-4', name: 'Dito Pratama', email: 'dito@siswa.id', role: 'siswa', avatar: '👦', kelas: '6A', points: 720, badges: ['first-quiz'], streakDays: 1 },
-  { id: 'siswa-5', name: 'Eka Lestari', email: 'eka@siswa.id', role: 'siswa', avatar: '👧', kelas: '6B', points: 1120, badges: ['first-quiz', 'reader', 'scientist'], streakDays: 4 },
-  { id: 'guru-1', name: 'Bu Rina Hartati', email: 'rina@guru.id', role: 'guru', avatar: '👩‍🏫', points: 0, badges: [], streakDays: 0 },
+  { id: 'siswa-1', name: 'Aisyah Putri', email: 'aisyah@siswa.id', role: 'siswa', avatar: '👧', kelas: '6A', sekolahId: 'sch-1', points: 1240, badges: ['first-quiz', 'math-master', 'streak-3'], streakDays: 5 },
+  { id: 'siswa-2', name: 'Budi Santoso', email: 'budi@siswa.id', role: 'siswa', avatar: '👦', kelas: '6A', sekolahId: 'sch-1', points: 980, badges: ['first-quiz', 'reader'], streakDays: 3 },
+  { id: 'siswa-3', name: 'Citra Wijaya', email: 'citra@siswa.id', role: 'siswa', avatar: '🧒', kelas: '6B', sekolahId: 'sch-2', points: 1560, badges: ['first-quiz', 'math-master', 'reader', 'streak-3', 'scientist'], streakDays: 7 },
+  { id: 'siswa-4', name: 'Dito Pratama', email: 'dito@siswa.id', role: 'siswa', avatar: '👦', kelas: '6A', sekolahId: 'sch-1', points: 720, badges: ['first-quiz'], streakDays: 1 },
+  { id: 'siswa-5', name: 'Eka Lestari', email: 'eka@siswa.id', role: 'siswa', avatar: '👧', kelas: '6B', sekolahId: 'sch-2', points: 1120, badges: ['first-quiz', 'reader', 'scientist'], streakDays: 4 },
+  { id: 'guru-1', name: 'Bu Rina Hartati', email: 'rina@guru.id', role: 'guru', avatar: '👩‍🏫', sekolahId: 'sch-1', points: 0, badges: [], streakDays: 0 },
+  { id: 'admin-1', name: 'Super Admin', email: 'admin@sekolah.id', role: 'administrator', avatar: '👨‍💼', points: 0, badges: [], streakDays: 0 },
+];
+
+export const MOCK_SCHOOLS: School[] = [
+  { id: 'sch-1', name: 'SDN 1 Pasean', address: 'Jl. Raya Pasean No. 1' },
+  { id: 'sch-2', name: 'SDN 2 Tlonto Ares', address: 'Jl. Desa Tlonto Ares' },
 ];
 
 export const MOCK_SUBJECTS: Subject[] = [
