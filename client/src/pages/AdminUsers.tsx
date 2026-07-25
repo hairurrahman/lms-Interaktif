@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getAllUsers, createUser, updateUser, deleteUser } from '@/services/dataStore';
+import { getAllUsers, createUser, updateUser, deleteUser, adminChangeUserPassword, demoPasswordMap } from '@/services/dataStore';
 import type { AppUser, Role } from '@/lib/mockData';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,9 +8,11 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Trash2, Pencil, Save, X, Users, Search, Building, Camera } from 'lucide-react';
+import { Plus, Trash2, Pencil, Save, X, Users, Search, Building, KeyRound, Eye, EyeOff, FileSpreadsheet, Download, Upload } from 'lucide-react';
 import { getSchools, createSchool, updateSchool, deleteSchool } from '@/services/dataStore';
 import type { School } from '@/lib/mockData';
+import * as XLSX from 'xlsx';
+import { DEMO_MODE } from '@/lib/firebase';
 
 export function AdminUsersPage() {
   const { toast } = useToast();
@@ -20,6 +22,8 @@ export function AdminUsersPage() {
   // add user form
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
+  const [addUserPassword, setAddUserPassword] = useState('123456');
+  const [addShowPassword, setAddShowPassword] = useState(false);
   const [newRole, setNewRole] = useState<Role>('siswa');
   const [newKelas, setNewKelas] = useState('');
   const [newSekolahId, setNewSekolahId] = useState('');
@@ -27,6 +31,13 @@ export function AdminUsersPage() {
   // edit user
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editUserData, setEditUserData] = useState<Partial<AppUser>>({});
+
+  // change password
+  const [changingPasswordUserId, setChangingPasswordUserId] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
 
   // schools
   const [schools, setSchools] = useState<School[]>([]);
@@ -94,19 +105,23 @@ export function AdminUsersPage() {
   const handleAddUser = async () => {
     if (!newName.trim() || !newEmail.trim() || (!newSekolahId && newRole !== 'administrator')) return;
     try {
-      await createUser({
+      const created = await createUser({
         name: newName.trim(),
         email: newEmail.trim(),
         role: newRole,
         kelas: newRole === 'siswa' ? newKelas.trim() : undefined,
         sekolahId: newRole !== 'administrator' ? newSekolahId : undefined,
         avatar: newRole === 'administrator' ? '👨‍💼' : newRole === 'guru' ? '👩‍🏫' : '🙂',
-      });
+      }, addUserPassword.trim());
       toast({ title: 'Pengguna ditambahkan', description: newName });
-      setNewName(''); setNewEmail(''); setNewRole('siswa'); setNewKelas('');
+      setNewName(''); setNewEmail(''); setAddUserPassword('123456'); setNewRole('siswa'); setNewKelas('');
       refresh();
     } catch (e: any) {
-      toast({ title: 'Gagal menambah pengguna', description: e.message, variant: 'destructive' });
+      let msg = e.message;
+      if (msg.includes('email-already-in-use')) {
+        msg = 'Email ini sudah terdaftar di Firebase Authentication. Jika Anda baru saja menghapus pengguna ini, Anda juga harus menghapusnya secara manual di Firebase Console -> Authentication sebelum mendaftarkannya kembali.';
+      }
+      toast({ title: 'Gagal menambah pengguna', description: msg, variant: 'destructive' });
     }
   };
 
@@ -125,10 +140,45 @@ export function AdminUsersPage() {
     if (!window.confirm(`Hapus pengguna "${name}"? Data yang terkait mungkin akan kehilangan referensi.`)) return;
     try {
       await deleteUser(id);
-      toast({ title: 'Pengguna dihapus' });
+      if (DEMO_MODE) {
+        toast({ title: 'Pengguna dihapus' });
+      } else {
+        toast({
+          title: 'Pengguna dihapus dari database',
+          description: `Catatan database berhasil dihapus. Agar pengguna tidak bisa login lagi, hapus akun autentikasinya secara manual di Firebase Console menggunakan UID berikut: ${id}`,
+          duration: 10000,
+        });
+      }
       refresh();
     } catch (e: any) {
       toast({ title: 'Gagal menghapus pengguna', description: e.message, variant: 'destructive' });
+    }
+  };
+
+  const handleChangePassword = async (user: AppUser) => {
+    if (newPassword.length < 6) {
+      toast({ title: 'Password terlalu pendek', description: 'Minimal 6 karakter.', variant: 'destructive' });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast({ title: 'Password tidak cocok', description: 'Pastikan konfirmasi password sama.', variant: 'destructive' });
+      return;
+    }
+    setSavingPassword(true);
+    try {
+      const result = await adminChangeUserPassword(user.id, user.email, newPassword);
+      if (result === 'demo_set') {
+        toast({ title: 'Password Berhasil Diubah', description: `Password untuk "${user.name}" telah diperbarui (demo mode).` });
+      } else {
+        toast({ title: 'Email Reset Terkirim', description: `Link reset password telah dikirim ke ${user.email}.` });
+      }
+      setChangingPasswordUserId(null);
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (e: any) {
+      toast({ title: 'Gagal Mengubah Password', description: e.message, variant: 'destructive' });
+    } finally {
+      setSavingPassword(false);
     }
   };
 
@@ -166,6 +216,109 @@ export function AdminUsersPage() {
     }
   };
 
+  // ---- Excel Template & Import ----
+  const downloadUserTemplate = () => {
+    const wb = XLSX.utils.book_new();
+
+    const petunjukData = [
+      ['PETUNJUK IMPOR PENGGUNA MASSAL'],
+      [''],
+      ['Kolom yang tersedia:'],
+      ['- Nama Lengkap   : Wajib diisi'],
+      ['- Email          : Wajib diisi, harus unik'],
+      ['- Password       : Wajib diisi, minimal 6 karakter'],
+      ['- Peran          : siswa / guru / administrator'],
+      ['- Kelas          : Isi jika Peran = siswa (contoh: 6A)'],
+      ['- Nama Sekolah   : Nama sekolah yang sudah ada di sistem (kosongkan untuk admin)'],
+      [''],
+      ['CONTOH DATA:'],
+      ['Nama Lengkap', 'Email', 'Password', 'Peran', 'Kelas', 'Nama Sekolah'],
+      ['Budi Santoso', 'budi@sekolah.id', 'budi1234', 'siswa', '6A', 'SDN 1 Bendang'],
+      ['Siti Rahayu', 'siti@sekolah.id', 'siti5678', 'guru', '', 'SDN 1 Bendang'],
+      ['Ahmad Fauzi', 'ahmad@sekolah.id', 'ahmad123', 'siswa', '6B', 'SDN 2 Pasean'],
+    ];
+
+    const wsPetunjuk = XLSX.utils.aoa_to_sheet(petunjukData);
+    wsPetunjuk['!cols'] = [
+      { wch: 20 }, { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 8 }, { wch: 25 }
+    ];
+
+    const templateHeaders = [
+      ['Nama Lengkap', 'Email', 'Password', 'Peran', 'Kelas', 'Nama Sekolah']
+    ];
+    const wsTemplate = XLSX.utils.aoa_to_sheet(templateHeaders);
+    wsTemplate['!cols'] = [
+      { wch: 25 }, { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 8 }, { wch: 25 }
+    ];
+
+    XLSX.utils.book_append_sheet(wb, wsPetunjuk, 'Petunjuk & Contoh');
+    XLSX.utils.book_append_sheet(wb, wsTemplate, 'Template Pengguna');
+    XLSX.writeFile(wb, 'Template_Impor_Pengguna_LMS.xlsx');
+    toast({ title: 'Template Diunduh', description: 'Isi template lalu unggah kembali.' });
+  };
+
+  const handleUserFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const data = event.target?.result;
+        if (!data) return;
+        const workbook = XLSX.read(data, { type: 'binary' });
+        const sheetName = workbook.SheetNames.find(
+          n => n.toLowerCase().includes('template') || n.toLowerCase().includes('pengguna')
+        ) || workbook.SheetNames[0];
+        const rows = XLSX.utils.sheet_to_json<any>(workbook.Sheets[sheetName]);
+        if (rows.length === 0) {
+          toast({ title: 'File Kosong', description: 'Tidak ada data yang ditemukan.', variant: 'destructive' });
+          return;
+        }
+
+        let successCount = 0;
+        let failCount = 0;
+        for (const row of rows) {
+          const name = String(row['Nama Lengkap'] || '').trim();
+          const email = String(row['Email'] || '').trim();
+          const password = String(row['Password'] || '').trim();
+          const roleRaw = String(row['Peran'] || 'siswa').trim().toLowerCase();
+          const kelas = String(row['Kelas'] || '').trim();
+          const namaSekolah = String(row['Nama Sekolah'] || '').trim();
+
+          if (!name || !email) { failCount++; continue; }
+
+          const role: Role = roleRaw === 'guru' ? 'guru' : roleRaw === 'administrator' || roleRaw === 'admin' ? 'administrator' : 'siswa';
+          const sekolah = schools.find(s => s.name.toLowerCase() === namaSekolah.toLowerCase());
+          const sekolahId = sekolah?.id;
+
+          try {
+            const created = await createUser({
+              name,
+              email,
+              role,
+              kelas: role === 'siswa' && kelas ? kelas : undefined,
+              sekolahId: role !== 'administrator' && sekolahId ? sekolahId : undefined,
+              avatar: role === 'administrator' ? '👨‍💼' : role === 'guru' ? '👩‍🏫' : '🙂',
+            }, password);
+            successCount++;
+          } catch {
+            failCount++;
+          }
+        }
+
+        toast({
+          title: 'Impor Selesai',
+          description: `${successCount} pengguna berhasil, ${failCount} gagal/dilewati.`,
+        });
+        refresh();
+      } catch (err: any) {
+        toast({ title: 'Gagal Membaca Excel', description: err.message, variant: 'destructive' });
+      }
+    };
+    reader.readAsBinaryString(file);
+    e.target.value = '';
+  };
+
   const filteredUsers = users.filter((u) => u.name.toLowerCase().includes(filter.toLowerCase()) || u.email.toLowerCase().includes(filter.toLowerCase()));
 
   return (
@@ -193,14 +346,33 @@ export function AdminUsersPage() {
           <div className="flex items-center gap-2 font-bold">
             <Plus className="h-5 w-5 text-primary" /> Tambah Pengguna Baru
           </div>
-          <div className="grid gap-3 md:grid-cols-[2fr_2fr_1fr_1fr_2fr_auto] items-end">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <div className="space-y-1">
               <Label className="text-xs">Nama Lengkap</Label>
               <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nama pengguna" />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Email (Palsu/Asli)</Label>
+              <Label className="text-xs">Email</Label>
               <Input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="email@sekolah.id" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Password</Label>
+              <div className="relative">
+                <Input
+                  type={addShowPassword ? 'text' : 'password'}
+                  value={addUserPassword}
+                  onChange={(e) => setAddUserPassword(e.target.value)}
+                  placeholder="Min. 6 karakter"
+                  className="pr-9"
+                />
+                <button
+                  type="button"
+                  onClick={() => setAddShowPassword(v => !v)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {addShowPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                </button>
+              </div>
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Peran</Label>
@@ -228,9 +400,51 @@ export function AdminUsersPage() {
                 </Select>
               </div>
             )}
-            <Button onClick={handleAddUser} disabled={!newName.trim() || !newEmail.trim() || (!newSekolahId && newRole !== 'administrator')} className="font-bold">
-              <Plus className="h-4 w-4 mr-1" /> Tambah
+          </div>
+          <Button
+            onClick={handleAddUser}
+            disabled={!newName.trim() || !newEmail.trim() || addUserPassword.length < 6 || (!newSekolahId && newRole !== 'administrator')}
+            className="font-bold w-full sm:w-auto"
+          >
+            <Plus className="h-4 w-4 mr-1" /> Tambah Pengguna
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Impor Massal via Excel */}
+      <Card className="border-2 rounded-3xl bg-muted/20 border-dashed">
+        <CardContent className="p-5 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <FileSpreadsheet className="h-5 w-5 text-emerald-600" />
+              <div>
+                <h3 className="font-bold text-sm">Impor Pengguna via Excel</h3>
+                <p className="text-xs text-muted-foreground">Tambah banyak siswa atau guru sekaligus menggunakan template spreadsheet.</p>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={downloadUserTemplate}
+              className="flex items-center gap-1 text-xs self-start sm:self-auto"
+            >
+              <Download className="h-3.5 w-3.5" /> Unduh Template
             </Button>
+          </div>
+          <div className="border border-dashed border-border rounded-2xl p-4 bg-background/50 flex flex-col items-center justify-center text-center gap-2 hover:bg-background transition-colors relative cursor-pointer group">
+            <input
+              type="file"
+              accept=".xlsx, .xls"
+              onChange={handleUserFileUpload}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+            />
+            <div className="h-10 w-10 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <Upload className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold">Pilih atau Seret File Excel (xlsx)</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Mendukung format .xlsx atau .xls</p>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -322,12 +536,91 @@ export function AdminUsersPage() {
                 
                 {!isEditing && (
                   <div className="flex gap-2 pt-2 border-t mt-2 border-border/50">
-                    <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={() => { setEditingUserId(u.id); setEditUserData({}); }}>
+                    <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={() => { setEditingUserId(u.id); setEditUserData({}); setChangingPasswordUserId(null); }}>
                       <Pencil className="h-3 w-3 mr-1" /> Edit
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs flex items-center gap-1"
+                      onClick={() => {
+                        if (changingPasswordUserId === u.id) {
+                          setChangingPasswordUserId(null);
+                          setNewPassword('');
+                          setConfirmPassword('');
+                        } else {
+                          setChangingPasswordUserId(u.id);
+                          setEditingUserId(null);
+                          setNewPassword('');
+                          setConfirmPassword('');
+                        }
+                      }}
+                    >
+                      <KeyRound className="h-3 w-3" />
                     </Button>
                     <Button size="sm" variant="outline" className="text-xs text-destructive hover:bg-destructive/10" onClick={() => handleDeleteUser(u.id, u.name)}>
                       <Trash2 className="h-3 w-3" />
                     </Button>
+                  </div>
+                )}
+
+                {/* Password change panel */}
+                {!isEditing && changingPasswordUserId === u.id && (
+                  <div className="mt-2 p-3 rounded-2xl bg-muted/50 border border-border space-y-2">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-foreground">
+                      <KeyRound className="h-3.5 w-3.5 text-primary" /> Ubah Password
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Password Baru (min. 6 karakter)</Label>
+                      <div className="relative">
+                        <Input
+                          type={showPassword ? 'text' : 'password'}
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="Password baru..."
+                          className="pr-9 text-sm"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(v => !v)}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        >
+                          {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Konfirmasi Password</Label>
+                      <Input
+                        type={showPassword ? 'text' : 'password'}
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="Ulangi password baru..."
+                        className="text-sm"
+                      />
+                    </div>
+                    {confirmPassword && newPassword !== confirmPassword && (
+                      <p className="text-[11px] text-destructive font-semibold">⚠ Password tidak cocok</p>
+                    )}
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        className="flex-1 text-xs"
+                        disabled={savingPassword || newPassword.length < 6 || newPassword !== confirmPassword}
+                        onClick={() => handleChangePassword(u)}
+                      >
+                        <Save className="h-3 w-3 mr-1" />
+                        {savingPassword ? 'Menyimpan...' : 'Simpan Password'}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-xs"
+                        onClick={() => { setChangingPasswordUserId(null); setNewPassword(''); setConfirmPassword(''); }}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
                   </div>
                 )}
               </CardContent>

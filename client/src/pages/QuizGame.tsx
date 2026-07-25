@@ -50,6 +50,7 @@ export function QuizGamePage() {
   const [started, setStarted] = useState(false);
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState<AnswerMap>({});
+  const [revealed, setRevealed] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
   const [done, setDone] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -61,6 +62,11 @@ export function QuizGamePage() {
       const q = await getQuiz(params.id);
       setQuiz(q);
       if (q) setMaterial(await getMaterial(q.materialId));
+      setCurrent(0);
+      setAnswers({});
+      setRevealed(false);
+      setDone(false);
+      setSubmitted(false);
     })();
   }, [params?.id]);
 
@@ -154,6 +160,7 @@ export function QuizGamePage() {
       return;
     }
     setCurrent((c) => c + 1);
+    setRevealed(false);
   };
 
   const handleRetry = () => {
@@ -162,6 +169,7 @@ export function QuizGamePage() {
     setAnswers({});
     setDone(false);
     setSubmitted(false);
+    setRevealed(false);
     setTimeLeft(quiz?.timeLimitSec ?? 0);
   };
 
@@ -379,18 +387,39 @@ export function QuizGamePage() {
             <div className="grid gap-3">
               {q.options.map((opt, i) => {
                 const isSelected = resp === opt.id;
+                const isCorrect = q.correctOptionId === opt.id;
                 const letter = String.fromCharCode(65 + i);
+
+                let btnClass = 'border-border';
+                let circleClass = 'bg-muted text-foreground';
+
+                if (revealed) {
+                  if (isCorrect) {
+                    btnClass = 'border-secondary bg-secondary/10';
+                    circleClass = 'bg-secondary text-white';
+                  } else if (isSelected) {
+                    btnClass = 'border-destructive bg-destructive/10';
+                    circleClass = 'bg-destructive text-white';
+                  } else {
+                    btnClass = 'border-border opacity-65';
+                  }
+                } else if (isSelected) {
+                  btnClass = 'border-primary bg-primary/10';
+                  circleClass = 'bg-primary text-primary-foreground';
+                }
+
                 return (
                   <button
                     key={opt.id}
+                    disabled={revealed}
                     onClick={() => setAnswer(q.id, opt.id)}
                     data-testid={`option-${opt.id}`}
-                    className={`w-full text-left rounded-2xl border-2 p-3 md:p-4 flex items-center gap-3 transition-all hover-elevate active-elevate-2 ${
-                      isSelected ? 'border-primary bg-primary/10' : 'border-border'
-                    }`}
+                    className={`w-full text-left rounded-2xl border-2 p-3 md:p-4 flex items-center gap-3 transition-all ${
+                      !revealed ? 'hover-elevate active-elevate-2' : ''
+                    } ${btnClass}`}
                   >
-                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl font-extrabold text-sm md:text-base ${isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground'}`}>
-                      {letter}
+                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl font-extrabold text-sm md:text-base ${circleClass}`}>
+                      {revealed && isCorrect ? <Check className="h-4 w-4" /> : revealed && isSelected && !isCorrect ? <X className="h-4 w-4" /> : letter}
                     </div>
                     <LatexRenderer
                       html={opt.text}
@@ -412,23 +441,48 @@ export function QuizGamePage() {
                 {q.options.map((opt, i) => {
                   const arr = Array.isArray(resp) ? (resp as string[]) : [];
                   const isChecked = arr.includes(opt.id);
+                  const isCorrect = q.correctOptionIds.includes(opt.id);
                   const letter = String.fromCharCode(65 + i);
+
+                  let btnClass = 'border-border';
+                  let boxClass = 'border-border bg-background';
+                  let numClass = 'bg-muted text-foreground';
+
+                  if (revealed) {
+                    if (isCorrect) {
+                      btnClass = 'border-secondary bg-secondary/10';
+                      boxClass = 'bg-secondary border-secondary text-white';
+                      numClass = 'bg-secondary/20 text-secondary';
+                    } else if (isChecked) {
+                      btnClass = 'border-destructive bg-destructive/10';
+                      boxClass = 'bg-destructive border-destructive text-white';
+                      numClass = 'bg-destructive/20 text-destructive';
+                    } else {
+                      btnClass = 'border-border opacity-65';
+                    }
+                  } else if (isChecked) {
+                    btnClass = 'border-primary bg-primary/10';
+                    boxClass = 'bg-primary border-primary text-primary-foreground';
+                    numClass = 'bg-primary/20 text-primary';
+                  }
+
                   return (
                     <button
                       key={opt.id}
+                      disabled={revealed}
                       onClick={() => {
                         const newArr = isChecked ? arr.filter((x) => x !== opt.id) : [...arr, opt.id];
                         setAnswer(q.id, newArr);
                       }}
                       data-testid={`option-multi-${opt.id}`}
-                      className={`w-full text-left rounded-2xl border-2 p-3 md:p-4 flex items-center gap-2 md:gap-3 transition-all hover-elevate active-elevate-2 ${
-                        isChecked ? 'border-primary bg-primary/10' : 'border-border'
-                      }`}
+                      className={`w-full text-left rounded-2xl border-2 p-3 md:p-4 flex items-center gap-2 md:gap-3 transition-all ${
+                        !revealed ? 'hover-elevate active-elevate-2' : ''
+                      } ${btnClass}`}
                     >
-                      <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 ${isChecked ? 'bg-primary border-primary' : 'border-border bg-background'}`}>
-                        {isChecked && <Check className="h-3.5 w-3.5 text-primary-foreground" />}
+                      <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 ${boxClass}`}>
+                        {isChecked && <Check className="h-3.5 w-3.5" />}
                       </div>
-                      <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg font-extrabold text-sm ${isChecked ? 'bg-primary/20 text-primary' : 'bg-muted text-foreground'}`}>
+                      <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg font-extrabold text-sm ${numClass}`}>
                         {letter}
                       </div>
                       <LatexRenderer
@@ -461,8 +515,15 @@ export function QuizGamePage() {
                     {q.statements.map((s, i) => {
                       const state = (resp as Record<string, boolean>) || {};
                       const val = state[s.id];
+                      const isCorrect = val === s.isTrue;
+
+                      let rowClass = '';
+                      if (revealed) {
+                        rowClass = isCorrect ? 'bg-secondary/5 border-secondary/20' : 'bg-destructive/5 border-destructive/20';
+                      }
+
                       return (
-                        <tr key={s.id} className="border-t">
+                        <tr key={s.id} className={`border-t ${rowClass}`}>
                           <td className="p-2 md:p-3 align-top">
                             <div className="flex items-start gap-1.5 md:gap-2">
                               <span className="text-muted-foreground font-bold">{i + 1}.</span>
@@ -474,10 +535,19 @@ export function QuizGamePage() {
                           </td>
                           <td className="p-2 text-center align-top">
                             <button
+                              disabled={revealed}
                               onClick={() => setAnswer(q.id, { ...state, [s.id]: true })}
                               data-testid={`tf-true-${s.id}`}
                               className={`h-8 w-8 md:h-10 md:w-10 rounded-lg md:rounded-xl border-2 inline-flex items-center justify-center transition-all ${
-                                val === true ? 'bg-secondary border-secondary text-white' : 'border-border bg-background hover:border-secondary/60'
+                                val === true
+                                  ? revealed
+                                    ? s.isTrue
+                                      ? 'bg-secondary border-secondary text-white'
+                                      : 'bg-destructive border-destructive text-white'
+                                    : 'bg-secondary border-secondary text-white'
+                                  : revealed && s.isTrue
+                                  ? 'border-secondary/55 text-secondary animate-pulse'
+                                  : 'border-border bg-background hover:border-secondary/60'
                               }`}
                               aria-label="Benar"
                             >
@@ -486,10 +556,19 @@ export function QuizGamePage() {
                           </td>
                           <td className="p-2 text-center align-top">
                             <button
+                              disabled={revealed}
                               onClick={() => setAnswer(q.id, { ...state, [s.id]: false })}
                               data-testid={`tf-false-${s.id}`}
                               className={`h-8 w-8 md:h-10 md:w-10 rounded-lg md:rounded-xl border-2 inline-flex items-center justify-center transition-all ${
-                                val === false ? 'bg-destructive border-destructive text-white' : 'border-border bg-background hover:border-destructive/60'
+                                val === false
+                                  ? revealed
+                                    ? !s.isTrue
+                                      ? 'bg-secondary border-secondary text-white'
+                                      : 'bg-destructive border-destructive text-white'
+                                    : 'bg-destructive border-destructive text-white'
+                                  : revealed && !s.isTrue
+                                  ? 'border-destructive/55 text-destructive animate-pulse'
+                                  : 'border-border bg-background hover:border-destructive/60'
                               }`}
                               aria-label="Salah"
                             >
@@ -505,16 +584,51 @@ export function QuizGamePage() {
             </div>
           )}
 
+          {revealed && (
+            <div className="mt-4 p-4 rounded-2xl bg-muted border border-border space-y-3">
+              <div className="flex items-center gap-2 font-bold text-sm">
+                {computeAutoScore(q, resp).correct ? (
+                  <span className="flex items-center gap-1.5 text-secondary">
+                    <Check className="h-4.5 w-4.5" /> Jawaban Anda Benar!
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5 text-destructive">
+                    <X className="h-4.5 w-4.5" /> Jawaban Anda Kurang Tepat
+                  </span>
+                )}
+              </div>
 
-          <Button
-            className="w-full h-12 text-base font-extrabold"
-            onClick={handleNext}
-            disabled={!canProceed}
-            data-testid="button-next"
-          >
-            {current >= quiz.questions.length - 1 ? 'Selesai' : 'Lanjut'}
-            <ArrowRight className="h-4 w-4 ml-2" />
-          </Button>
+              {q.explanation ? (
+                <div className="space-y-1">
+                  <div className="text-xs font-semibold text-muted-foreground">Pembahasan:</div>
+                  <LatexRenderer html={q.explanation} className="text-sm leading-relaxed" />
+                </div>
+              ) : (
+                <div className="text-xs italic text-muted-foreground">Tidak ada penjelasan tambahan untuk soal ini.</div>
+              )}
+            </div>
+          )}
+
+          {!revealed ? (
+            <Button
+              className="w-full h-12 text-base font-extrabold bg-gradient-ocean hover:opacity-90 shadow-playful"
+              onClick={() => setRevealed(true)}
+              disabled={!canProceed}
+              data-testid="button-check"
+            >
+              Periksa Jawaban
+              <Check className="h-4 w-4 ml-2" />
+            </Button>
+          ) : (
+            <Button
+              className="w-full h-12 text-base font-extrabold animate-bounce-in"
+              onClick={handleNext}
+              data-testid="button-next"
+            >
+              {current >= quiz.questions.length - 1 ? 'Selesai' : 'Lanjut'}
+              <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
+          )}
         </CardContent>
       </Card>
     </div>

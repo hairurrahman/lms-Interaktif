@@ -4,13 +4,14 @@
 // Replace the demo branches with production-ready Firestore calls as shown
 // in the comments. Example signatures match `firebase/firestore` v10.
 
-import { DEMO_MODE, db } from '@/lib/firebase';
+import { DEMO_MODE, db, auth, app } from '@/lib/firebase';
 import {
   collection,
   doc,
   getDoc,
   getDocs,
   addDoc,
+  setDoc,
   updateDoc,
   deleteDoc,
   query,
@@ -24,6 +25,8 @@ import {
   Timestamp,
   type Unsubscribe,
 } from 'firebase/firestore';
+import { initializeApp, deleteApp } from 'firebase/app';
+import { getAuth, sendPasswordResetEmail, createUserWithEmailAndPassword } from 'firebase/auth';
 
 import {
   MOCK_BADGES,
@@ -64,6 +67,9 @@ const store = {
   comments: [...MOCK_COMMENTS],
   schools: [...MOCK_SCHOOLS],
 };
+
+// Stores demo-mode passwords (userId -> password)
+export const demoPasswordMap = new Map<string, string>();
 
 type Listener = () => void;
 const listeners = new Set<Listener>();
@@ -429,6 +435,28 @@ export async function submitScore(data: Omit<Score, 'id' | 'completedAt'>): Prom
   return { ...score, id: ref.id };
 }
 
+export async function resetStudentProgress(studentId: string): Promise<void> {
+  if (DEMO_MODE || !db) {
+    store.scores = store.scores.filter((s) => s.userId !== studentId);
+    const user = store.users.find((u) => u.id === studentId);
+    if (user) {
+      user.points = 0;
+      user.badges = [];
+    }
+    notify();
+    return;
+  }
+  const activeDb = db;
+  const q = query(collection(activeDb, 'scores'), where('userId', '==', studentId));
+  const snap = await getDocs(q);
+  const deletePromises = snap.docs.map((d) => deleteDoc(doc(activeDb, 'scores', d.id)));
+  await Promise.all(deletePromises);
+  await updateDoc(doc(activeDb, 'users', studentId), {
+    points: 0,
+    badges: []
+  });
+}
+
 export async function getScoresByUser(userId: string): Promise<Score[]> {
   if (DEMO_MODE || !db) return store.scores.filter((s) => s.userId === userId);
   const q = query(collection(db, 'scores'), where('userId', '==', userId));
@@ -529,7 +557,24 @@ export async function updateUser(id: string, data: Partial<Omit<AppUser, 'id'>>)
   await updateDoc(doc(db, 'users', id), data);
 }
 
-export async function createUser(data: Omit<AppUser, 'id' | 'points' | 'badges' | 'streakDays'>): Promise<AppUser> {
+/**
+ * Change a user's password from the admin panel.
+ * - Demo mode: stores it in demoPasswordMap so next signIn checks it.
+ * - Firebase mode: sends a password reset email to the user's email address.
+ */
+export async function adminChangeUserPassword(userId: string, userEmail: string, newPassword: string): Promise<'demo_set' | 'email_sent'> {
+  if (DEMO_MODE || !auth) {
+    demoPasswordMap.set(userId, newPassword);
+    return 'demo_set';
+  }
+  await sendPasswordResetEmail(auth, userEmail);
+  return 'email_sent';
+}
+
+export async function createUser(
+  data: Omit<AppUser, 'id' | 'points' | 'badges' | 'streakDays'>,
+  password?: string
+): Promise<AppUser> {
   const newUser: AppUser = {
     ...data,
     id: uid(),
@@ -537,15 +582,46 @@ export async function createUser(data: Omit<AppUser, 'id' | 'points' | 'badges' 
     badges: [],
     streakDays: 0,
   };
-  if (DEMO_MODE || !db) {
+  if (DEMO_MODE || !db || !auth || !app) {
     store.users.push(newUser);
     notify();
     return newUser;
   }
-  // Di Firebase sungguhan, sebaiknya pakai Cloud Functions untuk create auth user,
-  // tapi di sini kita simpan saja document-nya untuk mensimulasikan.
-  const ref = await addDoc(collection(db, 'users'), newUser);
-  return { ...newUser, id: ref.id };
+
+  // Real Firebase mode:
+  // Register the user in Firebase Authentication via a temporary app instance so the currently logged in admin session is not signed out.
+  let createdUid = newUser.id;
+  const pwd = password || '123456'; // default password
+
+  try {
+    const tempApp = initializeApp(app.options, `temp_auth_app_${Date.now()}`);
+    const tempAuth = getAuth(tempApp);
+    const cred = await createUserWithEmailAndPassword(tempAuth, newUser.email, pwd);
+    createdUid = cred.user.uid;
+    await deleteApp(tempApp);
+  } catch (err: any) {
+    console.error('Error creating Firebase auth user:', err);
+    throw new Error(`Gagal membuat akun autentikasi: ${err.message}`);
+  }
+
+  const finalUser: AppUser = {
+    ...newUser,
+    id: createdUid,
+  };
+
+  await setDoc(doc(db, 'users', createdUid), {
+    name: finalUser.name,
+    email: finalUser.email,
+    role: finalUser.role,
+    avatar: finalUser.avatar,
+    kelas: finalUser.kelas ?? null,
+    sekolahId: finalUser.sekolahId ?? null,
+    points: 0,
+    badges: [],
+    streakDays: 0,
+  });
+
+  return finalUser;
 }
 
 export async function deleteUser(id: string): Promise<void> {

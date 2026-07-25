@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
-import { getAllUsers, getAllScores, getSubjects, getBadges } from '@/services/dataStore';
+import { getAllUsers, getAllScores, getSubjects, getBadges, resetStudentProgress } from '@/services/dataStore';
 import type { AppUser, Score, Subject, Badge as BadgeType } from '@/lib/mockData';
 import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Users, TrendingUp, Trophy } from 'lucide-react';
+import { Search, Users, TrendingUp, Trophy, RotateCcw } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 
 export function TeacherStudentsPage() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [students, setStudents] = useState<AppUser[]>([]);
   const [scores, setScores] = useState<Score[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -34,6 +37,32 @@ export function TeacherStudentsPage() {
       setBadges(await getBadges());
     })();
   }, [user]);
+
+  const handleReset = async (studentId: string, name: string) => {
+    const ok = window.confirm(`Apakah Anda yakin ingin me-reset progres belajar untuk "${name}"?\n\nTindakan ini akan menghapus semua nilai kuis, poin, dan lencana (badge) siswa tersebut secara permanen.`);
+    if (!ok) return;
+
+    try {
+      await resetStudentProgress(studentId);
+      toast({ title: 'Progres Direset', description: `Progres belajar untuk "${name}" telah dibersihkan.` });
+      
+      const allUsers = await getAllUsers();
+      let studs = allUsers.filter((u) => u.role === 'siswa');
+      if (user?.role === 'guru' && user.sekolahId) {
+        studs = studs.filter((u) => u.sekolahId === user.sekolahId);
+      }
+      setStudents(studs);
+      
+      let allScrs = await getAllScores();
+      if (user?.role === 'guru' && user.sekolahId) {
+        const studIds = new Set(studs.map(s => s.id));
+        allScrs = allScrs.filter(s => studIds.has(s.userId));
+      }
+      setScores(allScrs);
+    } catch (err: any) {
+      toast({ title: 'Gagal Me-reset', description: err.message, variant: 'destructive' });
+    }
+  };
 
   const badgeMap = Object.fromEntries(badges.map((b) => [b.id, b]));
 
@@ -97,6 +126,17 @@ export function TeacherStudentsPage() {
                 <StatPill icon={<Trophy className="h-4 w-4" />} value={s.points} label="Poin" />
                 <StatPill icon={<TrendingUp className="h-4 w-4" />} value={`${avg}%`} label="Rata-rata" />
                 <StatPill icon={<Users className="h-4 w-4" />} value={quizCount} label="Kuis" />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleReset(s.id, s.name)}
+                  className="rounded-2xl border-destructive/30 hover:border-destructive hover:bg-destructive/10 text-destructive flex items-center gap-1.5 h-12 px-4 shrink-0"
+                  title="Reset Progres Belajar Siswa"
+                  data-testid={`btn-reset-progress-${s.id}`}
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Reset Progres
+                </Button>
               </div>
               <div className="mt-4 grid gap-3 sm:grid-cols-3">
                 {perSubject.map((p) => (

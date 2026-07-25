@@ -5,8 +5,9 @@ import {
   createQuiz,
   getQuizzesByMaterial,
   deleteQuiz,
+  getChaptersBySubject,
 } from '@/services/dataStore';
-import type { Subject, Material, Quiz, QuizQuestion, QuestionType, TrueFalseStatement } from '@/lib/mockData';
+import type { Subject, Material, Quiz, QuizQuestion, QuestionType, TrueFalseStatement, Chapter } from '@/lib/mockData';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,7 +15,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Trash2, Check, Sparkles, ClipboardList, CheckCheck, ListChecks, Image as ImageIcon, Bold, List, Calculator, ClipboardPaste } from 'lucide-react';
+import { Plus, Trash2, Check, Sparkles, ClipboardList, CheckCheck, ListChecks, Image as ImageIcon, Bold, List, Calculator, ClipboardPaste, FileSpreadsheet, Download, Upload } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 // ---- Draft types (memungkinkan editing offline sebelum save) ----
 interface DraftOption {
@@ -55,6 +57,7 @@ const emptyQ = (type: QuestionType): DraftQ => {
     statements: [
       { id: 's1', text: '', isTrue: true },
       { id: 's2', text: '', isTrue: false },
+      { id: 's3', text: '', isTrue: true },
     ] as TrueFalseStatement[],
   };
   return base;
@@ -63,10 +66,14 @@ const emptyQ = (type: QuestionType): DraftQ => {
 export function TeacherQuizzesPage() {
   const { toast } = useToast();
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [chapters, setChapters] = useState<Chapter[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [existingQuizzes, setExistingQuizzes] = useState<Quiz[]>([]);
 
   const [subjectId, setSubjectId] = useState('');
+  const [chapterId, setChapterId] = useState('');
+  const [topicId, setTopicId] = useState('');
+  const [subtopicId, setSubtopicId] = useState('');
   const [materialId, setMaterialId] = useState('');
   const [quizTitle, setQuizTitle] = useState('');
   const [timeLimit, setTimeLimit] = useState(120);
@@ -78,10 +85,52 @@ export function TeacherQuizzesPage() {
   }, []);
 
   useEffect(() => {
-    if (!subjectId) return;
+    if (!subjectId) {
+      setChapters([]);
+      setMaterials([]);
+      setChapterId('');
+      setTopicId('');
+      setSubtopicId('');
+      setMaterialId('');
+      return;
+    }
+    getChaptersBySubject(subjectId).then(setChapters);
     getMaterialsBySubject(subjectId).then(setMaterials);
+    setChapterId('');
+    setTopicId('');
+    setSubtopicId('');
     setMaterialId('');
   }, [subjectId]);
+
+  useEffect(() => {
+    setTopicId('');
+    setSubtopicId('');
+    setMaterialId('');
+  }, [chapterId]);
+
+  useEffect(() => {
+    setSubtopicId('');
+    setMaterialId('');
+  }, [topicId]);
+
+  useEffect(() => {
+    if (!subtopicId) {
+      setMaterialId('');
+      setQuizTitle('');
+      return;
+    }
+    const mat = materials.find((m) => m.subtopicId === subtopicId);
+    setMaterialId(mat ? mat.id : '');
+
+    const selectedChapter = chapters.find((c) => c.id === chapterId);
+    const selectedTopic = selectedChapter?.topics.find((t) => t.id === topicId);
+    const selectedSubtopic = selectedTopic?.subtopics.find((st) => st.id === subtopicId);
+    if (selectedSubtopic) {
+      setQuizTitle(selectedSubtopic.title);
+    } else {
+      setQuizTitle('');
+    }
+  }, [subtopicId, materials, chapters, chapterId, topicId]);
 
   useEffect(() => {
     if (materialId) getQuizzesByMaterial(materialId).then(setExistingQuizzes);
@@ -114,7 +163,6 @@ export function TeacherQuizzesPage() {
   const insertBold = (id: string) => {
     updateQ(id, { question: questions.find(q=>q.id===id)!.question + ` <strong>teks tebal</strong> ` });
   };
-
   // ---- Paste Options Function ----
   const handlePasteOptions = (id: string) => {
     const text = window.prompt('Paste teks opsi (contoh:\nA. Jawaban 1\nB. Jawaban 2\nC. Jawaban 3\nD. Jawaban 4):');
@@ -142,6 +190,190 @@ export function TeacherQuizzesPage() {
     } else {
       toast({ title: 'Format tidak dikenali', description: 'Pastikan teks dimulai dengan A., B., dll.', variant: 'destructive' });
     }
+  };
+
+  // ---- Excel Import & Export Functions ----
+  const downloadTemplate = () => {
+    const wb = XLSX.utils.book_new();
+    
+    // Sheet 1: Petunjuk Pengisian
+    const petunjukData = [
+      ['PETUNJUK PENGISIAN TEMPLATE SOAL KUIS'],
+      [''],
+      ['1. Kolom "Tipe Soal" wajib diisi dengan salah satu dari:'],
+      ['   - Pilihan Ganda (atau "mcq")'],
+      ['   - Pilihan Ganda Kompleks (atau "mcq-multi")'],
+      ['   - Benar Salah (atau "true-false")'],
+      ['2. Kolom "Pertanyaan" berisi teks soal (Mendukung tag HTML sederhana seperti <strong>tebal</strong> jika perlu).'],
+      ['3. Kolom "Poin" berisi angka skor/poin untuk soal tersebut (contoh: 10).'],
+      ['4. Kolom "Penjelasan" (opsional) berisi pembahasan soal setelah dijawab.'],
+      ['5. Pengisian Pilihan Ganda (Biasa & Kompleks):'],
+      ['   - Isi pilihan jawaban pada kolom "Opsi A / Pernyataan 1" sampai "Opsi D" (Opsi E bersifat opsional).'],
+      ['   - Kunci Jawaban (Pilihan Ganda): Tulis satu huruf pilihan yang benar (A / B / C / D / E). Contoh: A'],
+      ['   - Kunci Jawaban (PG Kompleks): Tulis huruf pilihan yang benar dipisahkan koma. Contoh: A, C'],
+      ['6. Pengisian Benar Salah (Wajib 3 Pernyataan):'],
+      ['   - Kolom "Opsi A / Pernyataan 1" diisi Pernyataan ke-1'],
+      ['   - Kolom "Opsi B / Pernyataan 2" diisi Pernyataan ke-2'],
+      ['   - Kolom "Opsi C / Pernyataan 3" diisi Pernyataan ke-3'],
+      ['   - Kolom "Opsi D" dan "Opsi E" dikosongkan.'],
+      ['   - Kunci Jawaban: Tulis status Benar/Salah untuk masing-masing pernyataan berurutan dipisahkan koma.'],
+      ['     Contoh: Benar, Salah, Benar (atau B, S, B)'],
+      [''],
+      ['CONTOH DATA:'],
+      ['Tipe Soal', 'Pertanyaan', 'Poin', 'Penjelasan', 'Opsi A / Pernyataan 1', 'Opsi B / Pernyataan 2', 'Opsi C / Pernyataan 3', 'Opsi D', 'Opsi E', 'Kunci Jawaban'],
+      ['Pilihan Ganda', 'Manakah yang termasuk bilangan bulat negatif?', 10, 'Bilangan bulat negatif bernilai kurang dari 0.', '5', '0', '-3', '1/2', '', 'C'],
+      ['Pilihan Ganda Kompleks', 'Pilih semua bilangan yang termasuk bilangan prima!', 15, 'Bilangan prima hanya memiliki faktor 1 dan dirinya sendiri.', '2', '4', '5', '9', '11', 'A, C, E'],
+      ['Benar Salah', 'Tentukan kebenaran dari pernyataan berikut!', 20, 'Bumi adalah planet ketiga. Matahari adalah bintang. Bulan adalah satelit bumi.', 'Bumi adalah planet ketiga dari Matahari', 'Matahari adalah planet terbesar', 'Bulan adalah satelit alami Bumi', '', '', 'Benar, Salah, Benar']
+    ];
+    
+    const wsPetunjuk = XLSX.utils.aoa_to_sheet(petunjukData);
+    
+    // Sheet 2: Template Kosong
+    const templateHeaders = [
+      ['Tipe Soal', 'Pertanyaan', 'Poin', 'Penjelasan', 'Opsi A / Pernyataan 1', 'Opsi B / Pernyataan 2', 'Opsi C / Pernyataan 3', 'Opsi D', 'Opsi E', 'Kunci Jawaban']
+    ];
+    const wsTemplate = XLSX.utils.aoa_to_sheet(templateHeaders);
+    
+    // Set widths
+    const colsWidth = [
+      { wch: 22 }, // Tipe Soal
+      { wch: 45 }, // Pertanyaan
+      { wch: 8 },  // Poin
+      { wch: 30 }, // Penjelasan
+      { wch: 30 }, // Opsi A / Pernyataan 1
+      { wch: 30 }, // Opsi B / Pernyataan 2
+      { wch: 30 }, // Opsi C / Pernyataan 3
+      { wch: 15 }, // Opsi D
+      { wch: 15 }, // Opsi E
+      { wch: 20 }  // Kunci Jawaban
+    ];
+    wsPetunjuk['!cols'] = colsWidth;
+    wsTemplate['!cols'] = colsWidth;
+    
+    XLSX.utils.book_append_sheet(wb, wsPetunjuk, 'Petunjuk & Contoh');
+    XLSX.utils.book_append_sheet(wb, wsTemplate, 'Template Kuis');
+    
+    XLSX.writeFile(wb, 'Template_Impor_Kuis_LMS.xlsx');
+    toast({ title: 'Template Diunduh', description: 'Silakan isi template tersebut dan unggah kembali.' });
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = event.target?.result;
+        if (!data) return;
+        
+        const workbook = XLSX.read(data, { type: 'binary' });
+        // Cari sheet template kuis atau fallback ke sheet pertama
+        const sheetName = workbook.SheetNames.find(
+          name => name.toLowerCase().includes('template') || name.toLowerCase().includes('kuis') || name.toLowerCase().includes('soal')
+        ) || workbook.SheetNames[0];
+        
+        const sheet = workbook.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json<any>(sheet);
+        
+        if (rows.length === 0) {
+          toast({ title: 'File Kosong', description: 'Tidak ada data soal yang ditemukan di sheet kuis.', variant: 'destructive' });
+          return;
+        }
+        
+        const parsedQuestions: DraftQ[] = [];
+        for (const row of rows) {
+          const tipeRaw = String(row['Tipe Soal'] || '').trim().toLowerCase();
+          const question = String(row['Pertanyaan'] || '').trim();
+          const points = Number(row['Poin'] || 10);
+          const explanation = String(row['Penjelasan'] || '').trim();
+          const optA = String(row['Opsi A / Pernyataan 1'] || '').trim();
+          const optB = String(row['Opsi B / Pernyataan 2'] || '').trim();
+          const optC = String(row['Opsi C / Pernyataan 3'] || '').trim();
+          const optD = String(row['Opsi D'] || '').trim();
+          const optE = String(row['Opsi E'] || '').trim();
+          const kunciRaw = String(row['Kunci Jawaban'] || '').trim();
+          
+          if (!question && !tipeRaw) continue;
+          
+          let type: QuestionType = 'mcq';
+          if (tipeRaw.includes('kompleks') || tipeRaw.includes('multi')) {
+            type = 'mcq-multi';
+          } else if (tipeRaw.includes('benar') || tipeRaw.includes('salah') || tipeRaw.includes('false') || tipeRaw.includes('tf')) {
+            type = 'true-false';
+          }
+          
+          const id = uid();
+          const draftQ: DraftQ = {
+            id,
+            type,
+            question,
+            points: isNaN(points) || points <= 0 ? 10 : points,
+            explanation,
+            options: [],
+            correctOptionId: 'a',
+            correctOptionIds: [],
+            statements: []
+          };
+          
+          if (type === 'mcq' || type === 'mcq-multi') {
+            const optionsList = [
+              { id: 'a', text: optA },
+              { id: 'b', text: optB },
+              { id: 'c', text: optC }
+            ];
+            if (optD) optionsList.push({ id: 'd', text: optD });
+            if (optE) optionsList.push({ id: 'e', text: optE });
+            
+            draftQ.options = optionsList;
+            
+            if (type === 'mcq') {
+              draftQ.correctOptionId = kunciRaw.toLowerCase();
+            } else {
+              draftQ.correctOptionIds = kunciRaw.split(/[\s,]+/).map(s => s.trim().toLowerCase()).filter(Boolean);
+            }
+          } else if (type === 'true-false') {
+            const keys = kunciRaw.split(/[\s,]+/).map(s => s.trim().toLowerCase()).filter(Boolean);
+            const isTrue = (val: string) => {
+              return val === 'benar' || val === 'b' || val === 'true' || val === 't' || val === '1';
+            };
+            
+            draftQ.statements = [
+              { id: 's1', text: optA, isTrue: keys[0] ? isTrue(keys[0]) : true },
+              { id: 's2', text: optB, isTrue: keys[1] ? isTrue(keys[1]) : false },
+              { id: 's3', text: optC, isTrue: keys[2] ? isTrue(keys[2]) : true }
+            ];
+          }
+          
+          parsedQuestions.push(draftQ);
+        }
+        
+        if (parsedQuestions.length === 0) {
+          toast({ title: 'Impor Gagal', description: 'Tidak ada baris soal yang valid.', variant: 'destructive' });
+          return;
+        }
+        
+        const replace = window.confirm(`Berhasil membaca ${parsedQuestions.length} soal.\n\nKlik OK untuk MENGGANTIKAN semua soal saat ini.\nKlik Batal / Cancel untuk MENAMBAHKAN di akhir soal saat ini.`);
+        
+        if (replace) {
+          setQuestions(parsedQuestions);
+          toast({ title: 'Impor Berhasil', description: `${parsedQuestions.length} soal diimpor (menggantikan soal lama).` });
+        } else {
+          setQuestions(prev => {
+            // Jika soal pertama kosong, ganti saja
+            if (prev.length === 1 && prev[0].question === '' && prev[0].options.every(o => o.text === '')) {
+              return parsedQuestions;
+            }
+            return [...prev, ...parsedQuestions];
+          });
+          toast({ title: 'Impor Berhasil', description: `${parsedQuestions.length} soal ditambahkan ke daftar.` });
+        }
+      } catch (err: any) {
+        toast({ title: 'Gagal Membaca Excel', description: err.message, variant: 'destructive' });
+      }
+    };
+    reader.readAsBinaryString(file);
+    e.target.value = ''; // Reset input agar bisa upload file yang sama
   };
 
   // Validasi draft → QuizQuestion
@@ -189,8 +421,12 @@ export function TeacherQuizzesPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!materialId || !quizTitle) {
-      toast({ title: 'Lengkapi judul & pilih materi', variant: 'destructive' });
+    if (!subtopicId) {
+      toast({ title: 'Pilih Sub Topik', description: 'Silakan pilih sub topik terlebih dahulu.', variant: 'destructive' });
+      return;
+    }
+    if (!materialId) {
+      toast({ title: 'Materi Belum Dibuat', description: 'Silakan buat materi untuk subtopik ini terlebih dahulu di menu Kelola Materi.', variant: 'destructive' });
       return;
     }
     const built: QuizQuestion[] = [];
@@ -213,9 +449,8 @@ export function TeacherQuizzesPage() {
         questions: built,
       });
       toast({ title: 'Kuis tersimpan', description: `${built.length} soal` });
-      setQuizTitle('');
+      setSubtopicId('');
       setQuestions([emptyQ('mcq')]);
-      setExistingQuizzes(await getQuizzesByMaterial(materialId));
     } catch (err: any) {
       toast({ title: 'Gagal menyimpan', description: err.message, variant: 'destructive' });
     } finally {
@@ -229,6 +464,9 @@ export function TeacherQuizzesPage() {
     if (materialId) setExistingQuizzes(await getQuizzesByMaterial(materialId));
     toast({ title: 'Kuis dihapus' });
   };
+
+  const selectedChapter = chapters.find((c) => c.id === chapterId);
+  const selectedTopic = selectedChapter?.topics.find((t) => t.id === topicId);
 
   return (
     <div className="mx-auto max-w-5xl px-4 md:px-6 py-6 md:py-8 space-y-6">
@@ -259,27 +497,39 @@ export function TeacherQuizzesPage() {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Materi</Label>
-                <Select value={materialId} onValueChange={setMaterialId} disabled={!subjectId}>
-                  <SelectTrigger data-testid="select-quiz-material"><SelectValue placeholder="Pilih materi" /></SelectTrigger>
+                <Label>Bab</Label>
+                <Select value={chapterId} onValueChange={setChapterId} disabled={!subjectId}>
+                  <SelectTrigger data-testid="select-quiz-chapter"><SelectValue placeholder="Pilih bab" /></SelectTrigger>
                   <SelectContent>
-                    {materials.map((m) => (
-                      <SelectItem key={m.id} value={m.id}>{m.title}</SelectItem>
+                    {chapters.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.title}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Judul Kuis</Label>
-                <Input
-                  value={quizTitle}
-                  onChange={(e) => setQuizTitle(e.target.value)}
-                  placeholder="Contoh: Kuis Bilangan Bulat"
-                  required
-                  data-testid="input-quiz-title"
-                />
+                <Label>Topik</Label>
+                <Select value={topicId} onValueChange={setTopicId} disabled={!selectedChapter}>
+                  <SelectTrigger data-testid="select-quiz-topic"><SelectValue placeholder="Pilih topik" /></SelectTrigger>
+                  <SelectContent>
+                    {selectedChapter?.topics.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>{t.title}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-1.5">
+                <Label>Sub Topik</Label>
+                <Select value={subtopicId} onValueChange={setSubtopicId} disabled={!selectedTopic}>
+                  <SelectTrigger data-testid="select-quiz-subtopic"><SelectValue placeholder="Pilih subtopik" /></SelectTrigger>
+                  <SelectContent>
+                    {selectedTopic?.subtopics.map((st) => (
+                      <SelectItem key={st.id} value={st.id}>{st.title}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5 md:col-span-2">
                 <Label>Batas Waktu (detik) — 0 = tanpa batas</Label>
                 <Input
                   type="number"
@@ -289,6 +539,57 @@ export function TeacherQuizzesPage() {
                   data-testid="input-time-limit"
                 />
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-2 rounded-3xl bg-muted/30">
+          <CardContent className="p-6 space-y-4">
+            <div className="flex items-center gap-2 font-bold text-lg text-primary">
+              <FileSpreadsheet className="h-5 w-5" />
+              Impor Soal dari Excel (XLSX)
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Membuat kuis lebih cepat menggunakan spreadsheet! Unduh template Excel kami, isi soal-soal Anda, lalu unggah kembali di sini.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={downloadTemplate}
+                className="h-11 rounded-xl border-2 flex items-center justify-center gap-2 hover:bg-primary/5"
+              >
+                <Download className="h-4 w-4" />
+                Unduh Template Excel
+              </Button>
+              <div className="relative">
+                <Input
+                  type="file"
+                  accept=".xlsx, .xls"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                  id="excel-upload-input"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  asChild
+                  className="w-full h-11 rounded-xl border-2 border-dashed border-primary/40 hover:border-primary/80 hover:bg-primary/5 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <label htmlFor="excel-upload-input">
+                    <Upload className="h-4 w-4 text-primary" />
+                    Pilih & Unggah File Excel
+                  </label>
+                </Button>
+              </div>
+            </div>
+            <div className="text-xs text-muted-foreground space-y-1">
+              <span className="font-semibold text-foreground">💡 Ketentuan Pengisian Template:</span>
+              <ul className="list-disc list-inside space-y-0.5 ml-1">
+                <li><strong className="text-foreground">Pilihan Ganda:</strong> Isi Opsi A-D (Opsi E opsional). Kunci: huruf pilihan (contoh: <code className="bg-muted px-1 py-0.5 rounded text-foreground">A</code>)</li>
+                <li><strong className="text-foreground">Pilihan Ganda Kompleks:</strong> Kunci: huruf-huruf pilihan dipisahkan koma (contoh: <code className="bg-muted px-1 py-0.5 rounded text-foreground">A, C</code>)</li>
+                <li><strong className="text-foreground">Benar Salah:</strong> Isi 3 Pernyataan di Opsi A-C. Kunci: status dipisahkan koma (contoh: <code className="bg-muted px-1 py-0.5 rounded text-foreground">Benar, Salah, Benar</code> atau <code className="bg-muted px-1 py-0.5 rounded text-foreground">B, S, B</code>)</li>
+              </ul>
             </div>
           </CardContent>
         </Card>

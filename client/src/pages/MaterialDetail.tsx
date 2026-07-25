@@ -40,7 +40,7 @@ export function MaterialDetailPage() {
   const embed = material.videoUrl ? convertToEmbed(material.videoUrl) : null;
 
   return (
-    <div className="mx-auto max-w-4xl px-3 sm:px-4 md:px-6 py-4 md:py-8 space-y-6">
+    <div className="mx-auto max-w-5xl px-3 sm:px-4 md:px-6 py-4 md:py-8 space-y-6">
       {/* Breadcrumb */}
       <Link
         href={subject ? `/mapel/${subject.id}` : '/mapel'}
@@ -120,27 +120,29 @@ export function MaterialDetailPage() {
       )}
 
       {/* Ringkasan (text atau HTML) — dengan dukungan LaTeX */}
-      <Card className="border-2 rounded-3xl">
-        <CardContent className="p-4 sm:p-5 md:p-7">
-          <div className="flex items-center gap-2 font-bold text-lg mb-3">
-            <FileText className="h-5 w-5 text-primary" />
-            Ringkasan Materi
-          </div>
-          {material.summaryFormat === 'html' ? (
-            <LatexRenderer
-              html={material.summary}
-              className="material-html leading-relaxed text-foreground/90"
-              data-testid="text-summary-html"
-            />
-          ) : (
-            <LatexRenderer
-              html={`<span>${material.summary}</span>`}
-              className="text-foreground/90 leading-relaxed whitespace-pre-line block"
-              data-testid="text-summary"
-            />
-          )}
-        </CardContent>
-      </Card>
+      <div className="space-y-3">
+        <div className="flex items-center gap-2 font-bold text-xl px-2">
+          <FileText className="h-6 w-6 text-primary" />
+          Ringkasan Materi
+        </div>
+        <Card className="border-2 rounded-3xl overflow-hidden">
+          <CardContent className="p-0">
+            {material.summaryFormat === 'html' ? (
+              <LatexRenderer
+                html={material.summary}
+                className="material-html leading-relaxed text-foreground/90 p-4 sm:px-0 sm:py-6"
+                data-testid="text-summary-html"
+              />
+            ) : (
+              <LatexRenderer
+                html={`<span>${material.summary}</span>`}
+                className="text-foreground/90 leading-relaxed whitespace-pre-line block p-4 sm:px-0 sm:py-6"
+                data-testid="text-summary"
+              />
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {/* CTA: Quiz */}
       {quizzes.length > 0 && (

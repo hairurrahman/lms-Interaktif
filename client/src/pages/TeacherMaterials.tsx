@@ -353,15 +353,15 @@ export function TeacherMaterialsPage() {
                     </p>
                   </TabsContent>
                   <TabsContent value="preview" className="mt-2">
-                    <div className="rounded-xl border bg-card p-4 min-h-[200px]">
+                    <div className="rounded-xl border bg-card overflow-hidden min-h-[200px]">
                       {summary ? (
                         summaryFormat === 'html' ? (
-                          <div className="material-html" dangerouslySetInnerHTML={{ __html: summary }} />
+                          <div className="material-html p-4 sm:px-0 sm:py-6" dangerouslySetInnerHTML={{ __html: summary }} />
                         ) : (
-                          <p className="whitespace-pre-line">{summary}</p>
+                          <p className="whitespace-pre-line p-4 sm:px-0 sm:py-6">{summary}</p>
                         )
                       ) : (
-                        <div className="text-sm text-muted-foreground italic">Preview kosong — tulis ringkasan dulu.</div>
+                        <div className="text-sm text-muted-foreground italic p-4">Preview kosong — tulis ringkasan dulu.</div>
                       )}
                     </div>
                   </TabsContent>

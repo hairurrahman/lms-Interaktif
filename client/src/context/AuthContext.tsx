@@ -10,7 +10,7 @@ import {
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { MOCK_USERS, type AppUser, type Role } from '@/lib/mockData';
-import { getUser } from '@/services/dataStore';
+import { getUser, demoPasswordMap } from '@/services/dataStore';
 
 interface AuthContextValue {
   user: AppUser | null;
@@ -89,6 +89,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Demo mode: just match by email
       const u = MOCK_USERS.find((x) => x.email.toLowerCase() === email.toLowerCase());
       if (!u) throw new Error('Email tidak terdaftar (coba pilih akun demo di bawah).');
+      
+      const setPassword = demoPasswordMap.get(u.id);
+      if (setPassword && setPassword !== password) {
+        throw new Error('Password salah. Silakan coba lagi.');
+      }
+
       demoSession = u.id;
       setUser(u);
       return;
