@@ -288,20 +288,37 @@ export function QuizGamePage() {
                         </div>
                         {q.type === 'mcq' ? (
                           !correct && (
-                            <div className="text-muted-foreground mt-1">
-                              Jawaban benar: <span className="font-bold text-foreground">{q.options.find((o) => o.id === q.correctOptionId)?.text}</span>
+                            <div className="text-muted-foreground mt-1 flex items-center gap-1.5 flex-wrap">
+                              <span>Jawaban benar:</span>
+                              <span className="font-bold text-foreground">
+                                <LatexRenderer html={q.options.find((o) => o.id === q.correctOptionId)?.text || ''} className="inline" />
+                              </span>
                             </div>
                           )
                         ) : q.type === 'mcq-multi' ? (
-                          <div className="text-muted-foreground mt-1">
-                            Jawaban benar: <span className="font-bold text-foreground">{q.correctOptionIds.map((id) => q.options.find((o) => o.id === id)?.text).join(', ')}</span>
+                          <div className="text-muted-foreground mt-1 flex items-center gap-1.5 flex-wrap">
+                            <span>Jawaban benar:</span>
+                            {q.correctOptionIds.map((id, index) => {
+                              const optText = q.options.find((o) => o.id === id)?.text || '';
+                              return (
+                                <span key={id} className="font-bold text-foreground flex items-center">
+                                  <LatexRenderer html={optText} className="inline" />
+                                  {index < q.correctOptionIds.length - 1 && <span className="mr-1">,</span>}
+                                </span>
+                              );
+                            })}
                           </div>
                         ) : q.type === 'true-false' ? (
                           <div className="text-muted-foreground mt-1">
                             Skor: {auto.points} / {q.points} poin
                           </div>
                         ) : null}
-                        {q.explanation && <div className="mt-1.5 text-xs italic text-muted-foreground">💡 {q.explanation}</div>}
+                        {q.explanation && (
+                          <div className="mt-1.5 text-xs italic text-muted-foreground flex items-start gap-1">
+                            <span>💡</span>
+                            <LatexRenderer html={q.explanation} className="inline" />
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

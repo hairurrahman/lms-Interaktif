@@ -24,7 +24,7 @@ export function StudentDashboard() {
     if (!user) return;
     getSubjects().then(setSubjects);
     getScoresByUser(user.id).then(setScores);
-    getLeaderboard(5).then(setLeaderboard);
+    getLeaderboard(5, user.sekolahId).then(setLeaderboard);
     getBadges().then(setBadges);
   }, [user]);
 

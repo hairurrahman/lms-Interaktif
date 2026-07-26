@@ -11,9 +11,9 @@ export function LeaderboardPage() {
   const [badges, setBadges] = useState<BadgeType[]>([]);
 
   useEffect(() => {
-    getLeaderboard(50).then(setUsers);
+    getLeaderboard(50, user?.sekolahId).then(setUsers);
     getBadges().then(setBadges);
-  }, []);
+  }, [user?.sekolahId]);
 
   const badgeMap = Object.fromEntries(badges.map((b) => [b.id, b]));
   const podium = users.slice(0, 3);

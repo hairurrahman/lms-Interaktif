@@ -640,14 +640,20 @@ export async function getAllUsers(): Promise<AppUser[]> {
   return snap.docs.map((d) => ({ ...(d.data() as Omit<AppUser, 'id'>), id: d.id }));
 }
 
-export async function getLeaderboard(limitCount = 10): Promise<AppUser[]> {
+export async function getLeaderboard(limitCount = 10, sekolahId?: string): Promise<AppUser[]> {
   if (DEMO_MODE || !db) {
-    return store.users
-      .filter((u) => u.role === 'siswa')
+    let filtered = store.users.filter((u) => u.role === 'siswa');
+    if (sekolahId) {
+      filtered = filtered.filter((u) => u.sekolahId === sekolahId);
+    }
+    return filtered
       .sort((a, b) => b.points - a.points)
       .slice(0, limitCount);
   }
-  const q = query(collection(db, 'users'), where('role', '==', 'siswa'));
+  let q = query(collection(db, 'users'), where('role', '==', 'siswa'));
+  if (sekolahId) {
+    q = query(collection(db, 'users'), where('role', '==', 'siswa'), where('sekolahId', '==', sekolahId));
+  }
   const snap = await getDocs(q);
   const data = snap.docs.map((d) => ({ ...(d.data() as Omit<AppUser, 'id'>), id: d.id }));
   return data.sort((a, b) => (b.points || 0) - (a.points || 0)).slice(0, limitCount);

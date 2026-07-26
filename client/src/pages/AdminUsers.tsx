@@ -13,6 +13,7 @@ import { getSchools, createSchool, updateSchool, deleteSchool } from '@/services
 import type { School } from '@/lib/mockData';
 import * as XLSX from 'xlsx';
 import { DEMO_MODE } from '@/lib/firebase';
+import ExcelJS from 'exceljs';
 
 export function AdminUsersPage() {
   const { toast } = useToast();
@@ -217,44 +218,94 @@ export function AdminUsersPage() {
   };
 
   // ---- Excel Template & Import ----
-  const downloadUserTemplate = () => {
-    const wb = XLSX.utils.book_new();
+  const downloadUserTemplate = async () => {
+    try {
+      const workbook = new ExcelJS.Workbook();
 
-    const petunjukData = [
-      ['PETUNJUK IMPOR PENGGUNA MASSAL'],
-      [''],
-      ['Kolom yang tersedia:'],
-      ['- Nama Lengkap   : Wajib diisi'],
-      ['- Email          : Wajib diisi, harus unik'],
-      ['- Password       : Wajib diisi, minimal 6 karakter'],
-      ['- Peran          : siswa / guru / administrator'],
-      ['- Kelas          : Isi jika Peran = siswa (contoh: 6A)'],
-      ['- Nama Sekolah   : Nama sekolah yang sudah ada di sistem (kosongkan untuk admin)'],
-      [''],
-      ['CONTOH DATA:'],
-      ['Nama Lengkap', 'Email', 'Password', 'Peran', 'Kelas', 'Nama Sekolah'],
-      ['Budi Santoso', 'budi@sekolah.id', 'budi1234', 'siswa', '6A', 'SDN 1 Bendang'],
-      ['Siti Rahayu', 'siti@sekolah.id', 'siti5678', 'guru', '', 'SDN 1 Bendang'],
-      ['Ahmad Fauzi', 'ahmad@sekolah.id', 'ahmad123', 'siswa', '6B', 'SDN 2 Pasean'],
-    ];
+      // Sheet 1: Petunjuk & Contoh
+      const wsPetunjuk = workbook.addWorksheet('Petunjuk & Contoh');
+      wsPetunjuk.columns = [
+        { width: 25 }, { width: 30 }, { width: 15 }, { width: 15 }, { width: 10 }, { width: 25 }
+      ];
+      wsPetunjuk.addRows([
+        ['PETUNJUK IMPOR PENGGUNA MASSAL'],
+        [''],
+        ['Kolom yang tersedia:'],
+        ['- Nama Lengkap   : Wajib diisi'],
+        ['- Email          : Wajib diisi, harus unik'],
+        ['- Password       : Wajib diisi, minimal 6 karakter'],
+        ['- Peran          : Wajib diisi (pilih dari dropdown: siswa atau guru)'],
+        ['- Kelas          : Isi jika Peran = siswa (contoh: 6A)'],
+        ['- Nama Sekolah   : Wajib diisi (pilih dari dropdown sekolah yang terdaftar)'],
+        [''],
+        ['CONTOH DATA:'],
+        ['Nama Lengkap', 'Email', 'Password', 'Peran', 'Kelas', 'Nama Sekolah'],
+        ['Budi Santoso', 'budi@sekolah.id', 'budi1234', 'siswa', '6A', schools[0]?.name || 'SDN 1 Bendang'],
+        ['Siti Rahayu', 'siti@sekolah.id', 'siti5678', 'guru', '', schools[0]?.name || 'SDN 1 Bendang']
+      ]);
 
-    const wsPetunjuk = XLSX.utils.aoa_to_sheet(petunjukData);
-    wsPetunjuk['!cols'] = [
-      { wch: 20 }, { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 8 }, { wch: 25 }
-    ];
+      wsPetunjuk.getCell('A1').font = { bold: true, size: 14 };
+      wsPetunjuk.getCell('A11').font = { bold: true };
 
-    const templateHeaders = [
-      ['Nama Lengkap', 'Email', 'Password', 'Peran', 'Kelas', 'Nama Sekolah']
-    ];
-    const wsTemplate = XLSX.utils.aoa_to_sheet(templateHeaders);
-    wsTemplate['!cols'] = [
-      { wch: 25 }, { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 8 }, { wch: 25 }
-    ];
+      // Sheet 3: Referensi
+      const wsRef = workbook.addWorksheet('Referensi_LMS', { state: 'veryHidden' });
+      wsRef.getCell('A1').value = 'siswa';
+      wsRef.getCell('A2').value = 'guru';
 
-    XLSX.utils.book_append_sheet(wb, wsPetunjuk, 'Petunjuk & Contoh');
-    XLSX.utils.book_append_sheet(wb, wsTemplate, 'Template Pengguna');
-    XLSX.writeFile(wb, 'Template_Impor_Pengguna_LMS.xlsx');
-    toast({ title: 'Template Diunduh', description: 'Isi template lalu unggah kembali.' });
+      schools.forEach((s, idx) => {
+        wsRef.getCell(`B${idx + 1}`).value = s.name;
+      });
+
+      // Sheet 2: Template Pengguna
+      const wsTemplate = workbook.addWorksheet('Template Pengguna');
+      wsTemplate.columns = [
+        { header: 'Nama Lengkap', key: 'name', width: 25 },
+        { header: 'Email', key: 'email', width: 30 },
+        { header: 'Password', key: 'password', width: 15 },
+        { header: 'Peran', key: 'role', width: 15 },
+        { header: 'Kelas', key: 'kelas', width: 10 },
+        { header: 'Nama Sekolah', key: 'sekolah', width: 25 }
+      ];
+
+      wsTemplate.getRow(1).font = { bold: true };
+
+      // Add dropdown validations
+      for (let i = 2; i <= 200; i++) {
+        wsTemplate.getCell(`D${i}`).dataValidation = {
+          type: 'list',
+          allowBlank: true,
+          formulae: ['Referensi_LMS!$A$1:$A$2'],
+          showErrorMessage: true,
+          errorTitle: 'Input Tidak Valid',
+          error: 'Pilih peran dari list yang disediakan (siswa atau guru).'
+        };
+
+        if (schools.length > 0) {
+          wsTemplate.getCell(`F${i}`).dataValidation = {
+            type: 'list',
+            allowBlank: true,
+            formulae: [`Referensi_LMS!$B$1:$B$${schools.length}`],
+            showErrorMessage: true,
+            errorTitle: 'Input Tidak Valid',
+            error: 'Pilih sekolah dari list sekolah yang terdaftar.'
+          };
+        }
+      }
+
+      // Write and trigger download
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'Template_Impor_Pengguna_LMS.xlsx';
+      a.click();
+      window.URL.revokeObjectURL(url);
+
+      toast({ title: 'Template Diunduh', description: 'Isi template lalu unggah kembali.' });
+    } catch (err: any) {
+      toast({ title: 'Gagal Membuat Template', description: err.message, variant: 'destructive' });
+    }
   };
 
   const handleUserFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {

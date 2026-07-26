@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { LatexRenderer } from '@/components/LatexRenderer';
 import { PenLine, CheckCircle2, Clock, User as UserIcon, Save } from 'lucide-react';
 
 interface QuizMap { [quizId: string]: Quiz }
@@ -170,9 +171,9 @@ export function TeacherEssayGradingPage() {
                       const alreadyGraded = a.manualScore !== null && a.manualScore !== undefined;
                       return (
                         <div key={a.questionId} className="rounded-2xl border-2 p-4 space-y-3 bg-muted/30">
-                          <div>
+                           <div>
                             <div className="text-xs font-bold text-muted-foreground">Pertanyaan {i + 1} · Maks {q.points} poin</div>
-                            <div className="font-semibold mt-1">{q.question}</div>
+                            <LatexRenderer html={q.question} className="font-semibold mt-1" />
                           </div>
                           <div className="rounded-xl bg-background border p-3">
                             <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Jawaban siswa</div>
@@ -184,7 +185,7 @@ export function TeacherEssayGradingPage() {
                           {q.sampleAnswer && (
                             <div className="rounded-xl bg-accent/10 border border-accent/30 p-3">
                               <div className="text-xs font-bold uppercase tracking-wider text-accent mb-1">Contoh Jawaban (panduan)</div>
-                              <p className="text-sm whitespace-pre-line">{q.sampleAnswer}</p>
+                              <LatexRenderer html={q.sampleAnswer} className="text-sm leading-relaxed" />
                             </div>
                           )}
 

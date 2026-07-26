@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Trash2, Check, Sparkles, ClipboardList, CheckCheck, ListChecks, Image as ImageIcon, Bold, List, Calculator, ClipboardPaste, FileSpreadsheet, Download, Upload } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { LatexRenderer } from '@/components/LatexRenderer';
 
 // ---- Draft types (memungkinkan editing offline sebelum save) ----
 interface DraftOption {
@@ -655,14 +656,62 @@ export function TeacherQuizzesPage() {
                       <Calculator className="h-4 w-4" />
                     </Button>
                   </div>
-                  <Textarea
+                   <Textarea
                     value={q.question}
                     onChange={(e) => updateQ(q.id, { question: e.target.value })}
-                    placeholder="Tulis pertanyaan... (Mendukung format HTML)"
+                    placeholder="Tulis pertanyaan... (Mendukung format HTML dan LaTeX seperti $x^2$ atau $$x^2$$)"
                     required
                     rows={3}
                     data-testid={`input-question-${idx}`}
                   />
+                  {q.question.trim() && (
+                    <div className="mt-2.5 p-4 rounded-2xl bg-primary/5 border border-primary/10 space-y-3">
+                      <div className="text-[10px] uppercase tracking-wider font-extrabold text-primary">Pratinjau Soal (Live Render HTML & LaTeX):</div>
+                      <LatexRenderer html={q.question} className="text-sm font-bold leading-relaxed text-foreground" />
+                      
+                      {/* Option previews */}
+                      {q.type === 'mcq' && q.options.some(o => o.text.trim()) && (
+                        <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 mt-2">
+                          {q.options.filter(o => o.text.trim()).map((o, i) => (
+                            <div key={o.id} className={`flex items-center gap-2 text-xs p-2.5 rounded-xl border ${q.correctOptionId === o.id ? 'bg-secondary/10 border-secondary/30 text-secondary-foreground' : 'bg-background border-border'}`}>
+                              <span className="font-extrabold text-primary">{String.fromCharCode(65 + i)}.</span>
+                              <LatexRenderer html={o.text} className="flex-1 font-semibold" />
+                              {q.correctOptionId === o.id && <span className="text-[10px] font-bold bg-secondary text-white px-1.5 py-0.5 rounded">Benar</span>}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {q.type === 'mcq-multi' && q.options.some(o => o.text.trim()) && (
+                        <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 mt-2">
+                          {q.options.filter(o => o.text.trim()).map((o, i) => {
+                            const isCorrect = q.correctOptionIds.includes(o.id);
+                            return (
+                              <div key={o.id} className={`flex items-center gap-2 text-xs p-2.5 rounded-xl border ${isCorrect ? 'bg-secondary/10 border-secondary/30 text-secondary-foreground' : 'bg-background border-border'}`}>
+                                <span className="font-extrabold text-primary">{String.fromCharCode(65 + i)}.</span>
+                                <LatexRenderer html={o.text} className="flex-1 font-semibold" />
+                                {isCorrect && <span className="text-[10px] font-bold bg-secondary text-white px-1.5 py-0.5 rounded">Benar</span>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {q.type === 'true-false' && q.statements.some(s => s.text.trim()) && (
+                        <div className="space-y-1.5 mt-2">
+                          {q.statements.filter(s => s.text.trim()).map((s, i) => (
+                            <div key={s.id} className="flex items-center gap-2.5 text-xs bg-background p-2.5 rounded-xl border border-border">
+                              <span className="font-bold text-muted-foreground w-4">{i + 1}.</span>
+                              <LatexRenderer html={s.text} className="flex-1 font-semibold" />
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${s.isTrue ? 'bg-secondary/20 text-secondary-foreground' : 'bg-destructive/20 text-destructive-foreground'}`}>
+                                {s.isTrue ? 'Benar' : 'Salah'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* MCQ */}
