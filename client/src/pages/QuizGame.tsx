@@ -279,7 +279,7 @@ export function QuizGamePage() {
                         {correct ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
                       </div>
                       <div className="flex-1 text-sm">
-                        <div className="font-semibold">
+                        <div className="font-normal text-foreground">
                           {i + 1}.{' '}
                           <LatexRenderer
                             html={q.question}
@@ -395,7 +395,7 @@ export function QuizGamePage() {
           {/* Question text */}
           <LatexRenderer
             html={q.question}
-            className="text-lg md:text-xl font-extrabold leading-snug"
+            className="text-base md:text-lg font-normal leading-relaxed text-foreground"
             data-testid="text-question"
           />
 

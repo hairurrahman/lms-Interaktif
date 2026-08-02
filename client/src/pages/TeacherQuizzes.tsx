@@ -667,7 +667,7 @@ export function TeacherQuizzesPage() {
                   {q.question.trim() && (
                     <div className="mt-2.5 p-4 rounded-2xl bg-primary/5 border border-primary/10 space-y-3">
                       <div className="text-[10px] uppercase tracking-wider font-extrabold text-primary">Pratinjau Soal (Live Render HTML & LaTeX):</div>
-                      <LatexRenderer html={q.question} className="text-sm font-bold leading-relaxed text-foreground" />
+                      <LatexRenderer html={q.question} className="text-sm leading-relaxed text-foreground" />
                       
                       {/* Option previews */}
                       {q.type === 'mcq' && q.options.some(o => o.text.trim()) && (
