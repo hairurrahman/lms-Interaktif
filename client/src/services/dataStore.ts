@@ -423,15 +423,40 @@ export async function deleteQuiz(id: string): Promise<void> {
 export async function submitScore(data: Omit<Score, 'id' | 'completedAt'>): Promise<Score> {
   const score: Score = { ...data, id: uid(), completedAt: Date.now() };
   if (DEMO_MODE || !db) {
+    const existingIdx = store.scores.findIndex((s) => s.userId === data.userId && s.quizId === data.quizId);
+    let oldPoints = 0;
+    if (existingIdx >= 0) {
+      oldPoints = store.scores[existingIdx].points || 0;
+      store.scores.splice(existingIdx, 1);
+    }
     store.scores.unshift(score);
-    // Add points to the user
     const user = store.users.find((u) => u.id === data.userId);
-    if (user) user.points += data.points;
+    if (user) user.points = (user.points || 0) - oldPoints + data.points;
     notify();
     return score;
   }
-  const ref = await addDoc(collection(db, 'scores'), { ...data, completedAt: serverTimestamp() });
-  await updateDoc(doc(db, 'users', data.userId), { points: increment(data.points) });
+  
+  const activeDb = db;
+  const q = query(collection(activeDb, 'scores'), where('userId', '==', data.userId), where('quizId', '==', data.quizId));
+  const snap = await getDocs(q);
+  
+  let oldPoints = 0;
+  if (!snap.empty) {
+    const deletePromises = snap.docs.map((d) => {
+      const oldData = d.data() as Score;
+      oldPoints += (oldData.points || 0);
+      return deleteDoc(doc(activeDb, 'scores', d.id));
+    });
+    await Promise.all(deletePromises);
+  }
+
+  const ref = await addDoc(collection(activeDb, 'scores'), { ...data, completedAt: serverTimestamp() });
+  
+  const pointDiff = data.points - oldPoints;
+  if (pointDiff !== 0) {
+    await updateDoc(doc(activeDb, 'users', data.userId), { points: increment(pointDiff) });
+  }
+  
   return { ...score, id: ref.id };
 }
 
