@@ -4,7 +4,7 @@ import type { AppUser, Score, Subject, Badge as BadgeType } from '@/lib/mockData
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Users, TrendingUp, Trophy, RotateCcw } from 'lucide-react';
+import { Search, Users, TrendingUp, Trophy, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
@@ -82,7 +82,7 @@ export function TeacherStudentsPage() {
             count === 0
               ? 0
               : Math.round((sub_scores.reduce((a, x) => a + x.correct / x.total, 0) / count) * 100);
-          return { subject: sub, count, avg: avgSub };
+          return { subject: sub, count, avg: avgSub, scores: sub_scores };
         });
         return { student: s, avg, quizCount: sScores.length, perSubject };
       })
@@ -140,18 +140,7 @@ export function TeacherStudentsPage() {
               </div>
               <div className="mt-4 grid gap-3 sm:grid-cols-3">
                 {perSubject.map((p) => (
-                  <div key={p.subject.id} className="rounded-2xl bg-muted/50 p-3">
-                    <div className="flex items-center justify-between text-sm font-bold">
-                      <span>{p.subject.emoji} {p.subject.name}</span>
-                      <span className={p.avg >= 80 ? 'text-secondary' : p.avg >= 60 ? 'text-warning-foreground' : 'text-muted-foreground'}>
-                        {p.count === 0 ? '—' : `${p.avg}%`}
-                      </span>
-                    </div>
-                    <div className="mt-1.5 h-1.5 rounded-full bg-muted overflow-hidden">
-                      <div className={`h-full ${p.subject.color}`} style={{ width: `${p.avg}%` }} />
-                    </div>
-                    <div className="text-[11px] text-muted-foreground mt-1">{p.count} kuis dikerjakan</div>
-                  </div>
+                  <SubjectProgressCard key={p.subject.id} p={p} />
                 ))}
               </div>
               {s.badges.length > 0 && (
@@ -183,6 +172,45 @@ function StatPill({ icon, value, label }: { icon: React.ReactNode; value: React.
         <div className="font-extrabold leading-tight">{value}</div>
         <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
       </div>
+    </div>
+  );
+}
+
+function SubjectProgressCard({ p }: { p: { subject: Subject; count: number; avg: number; scores: Score[] } }) {
+  const [isOpen, setIsOpen] = useState(false);
+  return (
+    <div className="rounded-2xl bg-muted/50 p-3">
+      <div 
+        className={`flex items-center justify-between text-sm font-bold ${p.count > 0 ? 'cursor-pointer hover:opacity-80' : ''}`}
+        onClick={() => p.count > 0 && setIsOpen(!isOpen)}
+      >
+        <span className="flex items-center gap-1.5">
+          <span>{p.subject.emoji}</span> <span>{p.subject.name}</span>
+        </span>
+        <div className="flex items-center gap-2">
+          <span className={p.avg >= 80 ? 'text-secondary' : p.avg >= 60 ? 'text-warning-foreground' : 'text-muted-foreground'}>
+            {p.count === 0 ? '—' : `${p.avg}%`}
+          </span>
+          {p.count > 0 && (
+            isOpen ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          )}
+        </div>
+      </div>
+      <div className="mt-1.5 h-1.5 rounded-full bg-muted overflow-hidden">
+        <div className={`h-full ${p.subject.color}`} style={{ width: `${p.avg}%` }} />
+      </div>
+      <div className="text-[11px] text-muted-foreground mt-1">{p.count} kuis dikerjakan</div>
+      
+      {p.count > 0 && isOpen && (
+        <div className="mt-2 space-y-1 pt-1">
+          {p.scores.map((score) => (
+            <div key={score.id} className="text-[10px] bg-background border border-border rounded-lg px-2 py-1.5 flex justify-between items-center gap-2">
+              <span className="truncate flex-1 font-medium text-foreground">{score.quizTitle || 'Kuis'}</span>
+              <span className="font-extrabold text-primary shrink-0">{Math.round((score.correct / score.total) * 100)}%</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
