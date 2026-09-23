@@ -65,7 +65,7 @@ export function LoginPage() {
         {/* Left: brand */}
         <div className="text-center md:text-left space-y-5">
           <div className="inline-flex items-center gap-2 bg-gradient-sunrise text-white px-4 py-2 rounded-full text-sm font-bold shadow-playful">
-            <Sparkles className="h-4 w-4" /> Gugus 3 Kec. Pasean
+            <Sparkles className="h-4 w-4" /> SDN Bindang 2 Kec. Pasean
           </div>
           <h1 className="text-4xl md:text-5xl font-extrabold leading-tight">
             Selamat Datang{' '}
